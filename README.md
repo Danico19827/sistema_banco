@@ -65,7 +65,6 @@ El proyecto combina dos estilos arquitectónicos de forma pragmática:
 
 ```bash
 git clone https://github.com/Danico19827/sistema_banco.git
-cd Banco
 ```
 
 ### 2. Crear entorno virtual y activarlo
