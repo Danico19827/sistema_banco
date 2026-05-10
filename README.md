@@ -24,7 +24,7 @@ Banco/
 │   ├── adapters/              # Implementaciones concretas (ORM, ML)
 │   ├── models.py              # Modelos ORM (Cliente, Cuenta, Transaccion)
 │   ├── forms.py               # Formulario de registro extendido
-│   ├── auth_views.py          # Vistas de registro y login
+│   ├── auth_views.py          # Vistas de autenticación (registro, login, inicio)
 │   ├── views.py               # Vistas del core bancario
 │   ├── container.py           # Contenedor de dependencias
 │   └── apps.py                # Configuración de la app Django
@@ -34,9 +34,13 @@ Banco/
 │   ├── integracion/
 │   └── concurrencia/
 ├── documentacion/             # Documentos (IEEE830, diagramas)
+├── static/                    # Archivos estáticos (CSS, JS, imágenes)
+│   └── css/
+│       └── estilo.css         # Estilos compartidos entre plantillas
 ├── templates/                 # Plantillas HTML
-│   ├── registro.html
-│   └── login.html
+│   ├── inicio.html            # Página de inicio / landing
+│   ├── registro.html          # Página de registro de usuarios
+│   └── login.html             # Página de login
 ├── manage.py                  # CLI de Django
 ├── requirements.txt
 ├── .env.example               # Variables de entorno de ejemplo
@@ -97,11 +101,15 @@ Luego edita `.env` con tus datos:
 SECRET_KEY=genera-tu-propia-clave-aqui
 DEBUG=True
 DB_NAME=bancadb
-DB_USER=postgres
+DB_USER=tu_usuario
 DB_PASSWORD=tu_password
-DB_HOST=localhost
+DB_HOST=tu_host_o_localhost
 DB_PORT=5432
 ```
+
+**Nota**: La configuración usa **Neon** por defecto. Para desarrollo local con PostgreSQL:
+  - Cambiar `DB_HOST` a `localhost`
+  - Asegúrate de que PostgreSQL esté corriendo
 
 **Para generar tu SECRET_KEY:**
 ```bash
@@ -123,6 +131,29 @@ python manage.py migrate
 ```
 
 Esto crea todas las tablas necesarias, incluyendo las del sistema de autenticación de Django.
+
+## 🌍 Configuración regional
+
+El proyecto está configurado para:
+- **Idioma**: Español (Argentina)
+- **Zona horaria**: `America/Argentina/Buenos_Aires`
+
+Estos parámetros se configuran automáticamente en `config/settings.py`:
+
+```python
+LANGUAGE_CODE = 'es-AR'
+TIME_ZONE = 'America/Argentina/Buenos_Aires'
+```
+
+## 🎨 Estilos y plantillas
+
+Los estilos CSS están centralizados en `static/css/estilo.css` y se comparten entre todas las plantillas HTML.
+
+### Página de inicio (`templates/inicio.html`)
+Landing page que muestra:
+- Descripción del sistema
+- Enlaces a Login y Registro
+- Cumplimiento con WCAG 2.1 AA y pautas OWASP
 
 ## 🧩 Explicación del código (módulo de login/registro)
 
@@ -158,6 +189,13 @@ class RegistroClienteForm(UserCreationForm):
 
 ### Vistas de autenticación (`infrastructure/auth_views.py`)
 
+#### Vista de inicio
+```python
+def inicio(request):
+    return render(request, 'inicio.html')
+```
+
+#### Vista de registro
 ```python
 def registro(request):
     if request.method == 'POST':
@@ -174,6 +212,7 @@ def registro(request):
 
 - **`transaction.atomic()`** garantiza que User y Cliente se creen juntos o ninguno (ACID).
 - **`login()`** crea la sesión segura automáticamente.
+- **Vista de inicio** proporciona un landing page central.
 
 ### Plantillas HTML (`templates/`)
 
@@ -185,9 +224,9 @@ def registro(request):
 
 ```python
 urlpatterns = [
-    path('registro/', registro, name='registro'),
-    path('login/', login_view, name='login'),
-    path('', login_view, name='inicio'),
+    path('', inicio, name='inicio'),              # Landing page
+    path('registro/', registro, name='registro'),  # Registro de nuevos usuarios
+    path('login/', login_view, name='login'),      # Login de usuarios existentes
 ]
 ```
 
@@ -199,13 +238,15 @@ python manage.py runserver
 
 Luego visitá en tu navegador:
 
+- **Inicio**: http://localhost:8000/
 - **Registro**: http://localhost:8000/registro/
 - **Login**: http://localhost:8000/login/
 
 ### Flujo de uso
-1. Creás una cuenta en `/registro/` con todos los datos.
-2. Inmediatamente quedás logueado y redirigido.
-3. En `/login/` podés iniciar sesión con cuentas existentes.
+1. Entrás a `/` (landing page).
+2. Podés crear una cuenta en `/registro/` con todos los datos.
+3. Después del registro, quedás logueado y redirigido.
+4. En `/login/` podés iniciar sesión con cuentas existentes.
 
 ## 🔒 Seguridad implementada
 
@@ -217,10 +258,11 @@ Luego visitá en tu navegador:
 
 ## 📝 Próximos pasos
 
-- Vista de inicio (dashboard) con saldo de cuenta
-- Transferencias con bloqueo pesimista (`select_for_update`)
-- Motor de fraude con Machine Learning
+- Dashboard con saldo de cuenta y historial de transacciones
+- Transferencias entre cuentas con bloqueo pesimista (`select_for_update`)
+- Motor de fraude con Machine Learning integrado
 - Pruebas de concurrencia con Locust
+- Módulo de reporte de transacciones
 
 ## 👥 Para el equipo
 

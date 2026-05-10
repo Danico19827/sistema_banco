@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bienvenido - Banco Hexagonal</title>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/estilo.css' %}">
+</head>
+<body>
+  <div class="card" style="max-width: 560px;">
+    <div class="logo">
+      <h1>Banco Hexagonal</h1>
+      <p>Seguridad, innovación y confianza</p>
+    </div>
+    <div style="text-align: center; margin-bottom: 1.5rem;">
+      <p style="color: #374151; margin-bottom: 0.75rem;">Administrá tus finanzas con la tecnología más avanzada.</p>
+      <p style="color: #6b7280; font-size: 0.875rem;">
+        Detección inteligente de fraudes, transferencias seguras y una experiencia accesible para todos.
+      </p>
+    </div>
+    <div class="actions">
+      <a href="{% url 'login' %}" class="btn-primary">Iniciar sesión</a>
+      <a href="{% url 'registro' %}" class="btn-secondary">Crear una cuenta nueva</a>
+    </div>
+    <p style="text-align: center; font-size: 0.75rem; color: #9ca3af; margin-top: 1.5rem;">
+      Cumple con las pautas WCAG 2.1 AA · Protegido con OWASP
+    </p>
+  </div>
+</body>
+</html>

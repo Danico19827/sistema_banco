@@ -1,9 +1,11 @@
-# infrastructure/auth_views.py
 from django.shortcuts import render, redirect
-from django.contrib.auth import login, authenticate
+from django.contrib.auth import login
 from django.contrib.auth.forms import AuthenticationForm
 from django.db import transaction
 from .forms import RegistroClienteForm
+
+def inicio(request):
+    return render(request, 'inicio.html')
 
 def registro(request):
     if request.method == 'POST':
