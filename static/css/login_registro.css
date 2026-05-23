@@ -1,0 +1,155 @@
+/* Contenedor adaptado al bloque central de la base */
+.auth-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 4rem 1rem;
+  background-color: #f8fafc;
+}
+
+/* La tarjeta del formulario */
+.auth-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  max-width: 480px;
+  padding: 2.5rem 2rem;
+  border-top: 4px solid #0f172a; /* Azul oscuro corporativo */
+}
+
+/* Encabezado interno */
+.auth-logo {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.auth-logo h2 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.auth-logo p {
+  color: #64748b;
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+
+/* Estructura del Formulario */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.field-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* Campos de escritura */
+.auth-form input, 
+.auth-form textarea {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  outline: none;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.auth-form input:focus, 
+.auth-form textarea:focus {
+  border-color: #38bdf8; /* Celeste de realce */
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+}
+
+/* Mensajes de ayuda de Django */
+.help-text {
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+/* Listado de errores de validación */
+.errorlist {
+  color: #dc2626;
+  font-size: 0.8rem;
+  font-weight: 500;
+  list-style: none;
+  padding: 0.5rem 0.75rem;
+  background-color: #fef2f2;
+  border-left: 3px solid #dc2626;
+  border-radius: 4px;
+  margin-top: 0.25rem;
+}
+
+/* Botón de acción principal */
+.btn-auth-primary {
+  background: #0f172a;
+  color: white;
+  border: none;
+  padding: 0.85rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  margin-top: 0.5rem;
+  text-align: center;
+  display: block;
+  text-decoration: none;
+}
+
+.btn-auth-primary:hover {
+  background: #1e293b;
+}
+
+/* Botón secundario para volver */
+.btn-auth-secondary {
+  background: white;
+  color: #1e293b;
+  border: 1px solid #cbd5e1;
+  padding: 0.7rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  text-align: center;
+  display: inline-block;
+  text-decoration: none;
+}
+
+.btn-auth-secondary:hover {
+  background: #f1f5f9;
+}
+
+/* Texto del pie de tarjeta */
+.auth-footer-text {
+  text-align: center;
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-top: 1.5rem;
+}
+
+.auth-footer-text a {
+  color: #38bdf8;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth-footer-text a:hover {
+  text-decoration: underline;
+}

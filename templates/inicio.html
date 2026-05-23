@@ -1,31 +1,66 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bienvenido - Banco Hexagonal</title>
-  {% load static %}
-  <link rel="stylesheet" href="{% static 'css/estilo.css' %}">
-</head>
-<body>
-  <div class="card" style="max-width: 560px;">
-    <div class="logo">
-      <h1>Banco Hexagonal</h1>
-      <p>Seguridad, innovación y confianza</p>
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Inicio - Banco Hexagonal{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/index.css' %}">
+{% endblock %}
+
+{% block content %}
+  <section class="hero">
+    <h1>Tu Futuro Financiero,<br>Seguro y Inteligente.</h1>
+    <p>Con Detección de Fraude y Minería de Datos incorporada en tiempo real.</p>
+  </section>
+
+  <section class="access-container">
+    <div class="access-card">
+      <h3>Accede a tu cuenta</h3>
+      <a href="{% url 'login' %}" class="btn-action primary">Iniciar sesión</a>
     </div>
-    <div style="text-align: center; margin-bottom: 1.5rem;">
-      <p style="color: #374151; margin-bottom: 0.75rem;">Administrá tus finanzas con la tecnología más avanzada.</p>
-      <p style="color: #6b7280; font-size: 0.875rem;">
-        Detección inteligente de fraudes, transferencias seguras y una experiencia accesible para todos.
-      </p>
+    <div class="access-card secondary">
+      <h3>Házte Cliente Ahora</h3>
+      <a href="{% url 'registro' %}" class="btn-action outline">Crear una cuenta nueva</a>
     </div>
-    <div class="actions">
-      <a href="{% url 'login' %}" class="btn-primary">Iniciar sesión</a>
-      <a href="{% url 'registro' %}" class="btn-secondary">Crear una cuenta nueva</a>
+  </section>
+
+  <section class="dashboard-section">
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h4>Flujo de Caja Mensual</h4>
+        <canvas id="chartFlujo" height="180"></canvas>
+      </div>
+
+      <div class="chart-card">
+        <h4>Patrones de Gasto por Categoría</h4>
+        <canvas id="chartGastos" height="180"></canvas>
+      </div>
+
+      <div class="indicators-list">
+        <div class="indicator-box">
+          <p class="title">Tasa interés Promedio</p>
+          <p class="value">1.9%</p>
+        </div>
+        <div class="indicator-box">
+          <p class="title">Tendencias de Mercado</p>
+          <p class="value" style="color: #10b981;">📈</p>
+        </div>
+        <div class="indicator-box">
+          <p class="title">Crecimiento de Ahorros</p>
+          <p class="value" style="color: var(--accent-blue);">+12.4%</p>
+        </div>
+      </div>
     </div>
-    <p style="text-align: center; font-size: 0.75rem; color: #9ca3af; margin-top: 1.5rem;">
-      Cumple con las pautas WCAG 2.1 AA · Protegido con OWASP
-    </p>
-  </div>
-</body>
-</html>
+
+    <div class="features-bar">
+      <div class="feature-item"><span>🧠</span> Inteligencia Artificial Antifraude</div>
+      <div class="feature-item"><span>📉</span> Inversiones Automatizadas</div>
+      <div class="feature-item"><span>🌐</span> Gestión Global de Activos</div>
+      <div class="feature-item"><span>📊</span> Minería de Datos Personalizada</div>
+    </div>
+  </section>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/charts_home.js' %}"></script>
+{% endblock %}
