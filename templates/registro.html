@@ -1,19 +1,21 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Abrir cuenta - Banco Hexagonal</title>
-  {% load static %}
-  <link rel="stylesheet" href="{% static 'css/estilo.css' %}">
-</head>
-<body>
-  <div class="card">
-    <div class="logo">
-      <h1>Banco Hexagonal</h1>
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Abrir cuenta - Banco Hexagonal{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/login_registro.css' %}?v=1.2">
+{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <h2>Banco Hexagonal</h2>
       <p>Abrir una cuenta nueva</p>
     </div>
-    <form method="post" novalidate>
+    
+    <form method="post" class="auth-form" novalidate>
       {% csrf_token %}
       
       <div class="field-group">
@@ -116,14 +118,16 @@
         {% endif %}
       </div>
 
-      <button type="submit" class="btn-primary">Abrir cuenta</button>
+      <button type="submit" class="btn-auth-primary">Abrir cuenta</button>
     </form>
-    <div class="footer-text">
+    
+    <div class="auth-footer-text">
       ¿Ya tienes cuenta? <a href="{% url 'login' %}">Iniciar sesión</a>
     </div>
-    <div style="text-align: center; margin-top: 1rem;">
-      <a href="{% url 'inicio' %}" class="btn-secondary" style="display: inline-block;">Volver al inicio</a>
+    
+    <div style="text-align: center; margin-top: 1.25rem;">
+      <a href="{% url 'inicio' %}" class="btn-auth-secondary">Volver al inicio</a>
     </div>
   </div>
-</body>
-</html>
+</div>
+{% endblock %}

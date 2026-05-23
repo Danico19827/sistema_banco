@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Banco Hexagonal{% endblock %}</title>
+  {% load static %}
+  
+  <link rel="icon" type="image/svg+xml" href="{% static 'images/favicon.svg' %}">
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="{% static 'css/base.css' %}">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+  <nav class="navbar">
+    <a href="{% url 'inicio' %}" class="brand">⬢ Banco Hexagonal</a>
+    <div class="nav-links">
+      <a href="{% url 'inicio' %}">Inicio</a>
+      <a href="#">Servicios</a>
+      <a href="#">Beneficios</a>
+      <a href="{% url 'login' %}" class="btn-login">Ingresar</a>
+    </div>
+  </nav>
+
+  <main style="flex: 1;">
+    {% block content %}
+    {% endblock %}
+  </main>
+
+  <footer>
+    <p>Cumple con las pautas WCAG 2.1 AA · Protegido con OWASP</p>
+    <div class="links">
+      <a href="#">Sobre Nosotros</a> | <a href="#">Seguridad</a> | <a href="#">Privacidad</a> | <a href="#">Contacto</a>
+    </div>
+  </footer>
+
+  {% block extra_js %}{% endblock %}
+
+</body>
+</html>
