@@ -84,6 +84,104 @@
       {% endif %}
     </div>
 
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 0.5rem 0;">
+
+    <p style="font-size: 0.8125rem; font-weight: 600; color: #4a5568; margin-bottom: 0.25rem;">Datos personales adicionales</p>
+
+    <div class="form-row">
+      <div class="field-group">
+        <label for="id_dni">DNI</label>
+        <input type="text" name="dni" id="id_dni" maxlength="8"
+               inputmode="numeric" pattern="[0-9]{7,8}"
+               autocomplete="off"
+               aria-label="DNI"
+               aria-describedby="dni-help" required>
+        <span id="dni-help" class="help-text">{{ form.dni.help_text }}</span>
+        {% if form.dni.errors %}
+          <ul class="errorlist" role="alert">
+            {% for error in form.dni.errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+      <div class="field-group">
+        <label for="id_fecha_nacimiento">Fecha de nacimiento</label>
+        <input type="date" name="fecha_nacimiento" id="id_fecha_nacimiento"
+               aria-label="Fecha de nacimiento">
+        <span class="help-text">{{ form.fecha_nacimiento.help_text }}</span>
+        {% if form.fecha_nacimiento.errors %}
+          <ul class="errorlist" role="alert">
+            {% for error in form.fecha_nacimiento.errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="field-group">
+        <label for="id_genero">Género</label>
+        <select name="genero" id="id_genero" aria-label="Género">
+          <option value="">Seleccionar</option>
+          <option value="M">Masculino</option>
+          <option value="F">Femenino</option>
+          <option value="N">No especifica</option>
+        </select>
+        {% if form.genero.errors %}
+          <ul class="errorlist" role="alert">
+            {% for error in form.genero.errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+      <div class="field-group">
+        <label for="id_nivel_educativo">Nivel educativo</label>
+        <select name="nivel_educativo" id="id_nivel_educativo" aria-label="Nivel educativo">
+          <option value="">Seleccionar</option>
+          <option value="primario">Primario</option>
+          <option value="secundario" selected>Secundario</option>
+          <option value="terciario">Terciario/Tecnicatura</option>
+          <option value="universitario">Universitario</option>
+          <option value="posgrado">Posgrado/Master</option>
+        </select>
+        {% if form.nivel_educativo.errors %}
+          <ul class="errorlist" role="alert">
+            {% for error in form.nivel_educativo.errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="field-group">
+        <label for="id_profesion">Ocupación / Profesión</label>
+        <input type="text" name="profesion" id="id_profesion" maxlength="100"
+               autocomplete="organization-title"
+               aria-label="Ocupación o profesión">
+        <span class="help-text">{{ form.profesion.help_text }}</span>
+        {% if form.profesion.errors %}
+          <ul class="errorlist" role="alert">
+            {% for error in form.profesion.errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+      <div class="field-group">
+        <label for="id_ingreso_mensual">Ingreso mensual</label>
+        <input type="number" name="ingreso_mensual" id="id_ingreso_mensual"
+               step="0.01" min="0"
+               placeholder="0.00"
+               autocomplete="off"
+               aria-label="Ingreso mensual">
+        <span class="help-text">{{ form.ingreso_mensual.help_text }}</span>
+        {% if form.ingreso_mensual.errors %}
+          <ul class="errorlist" role="alert">
+            {% for error in form.ingreso_mensual.errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    </div>
+
+    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 0.5rem 0;">
+
+    <p style="font-size: 0.8125rem; font-weight: 600; color: #4a5568; margin-bottom: 0.25rem;">Seguridad</p>
+
     <div class="field-group">
       <label for="id_password1">Contraseña</label>
       <input type="password" name="password1" id="id_password1"
