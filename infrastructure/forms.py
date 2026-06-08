@@ -2,6 +2,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from django.core.validators import RegexValidator
 from .models import Cliente
 
 class RegistroClienteForm(UserCreationForm):
@@ -13,7 +14,8 @@ class RegistroClienteForm(UserCreationForm):
     direccion = forms.CharField(widget=forms.Textarea(attrs={'rows': 3}), required=True, label='Dirección')
 
     dni = forms.CharField(max_length=8, required=True, label='DNI',
-                           help_text='Documento Nacional de Identidad (8 dígitos)')
+                           validators=[RegexValidator(r'^\d{7,8}$', 'El DNI debe tener 7 u 8 dígitos numéricos.')],
+                           help_text='Documento Nacional de Identidad (7 u 8 dígitos)')
     fecha_nacimiento = forms.DateField(
         required=False, label='Fecha de nacimiento',
         widget=forms.DateInput(attrs={'type': 'date'}),
