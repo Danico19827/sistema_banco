@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.validators import RegexValidator
 
 class Cliente(models.Model):
     GENERO = [
@@ -18,7 +19,11 @@ class Cliente(models.Model):
 
     usuario = models.OneToOneField(User, on_delete=models.CASCADE)
 
-    dni = models.CharField(max_length=8, unique=True, default='', help_text="Documento Nacional de Identidad único")
+    dni = models.CharField(
+        max_length=8, unique=True,
+        validators=[RegexValidator(r'^\d{7,8}$', 'El DNI debe tener 7 u 8 dígitos numéricos.')],
+        help_text="Documento Nacional de Identidad (7 u 8 dígitos)"
+    )
 
     telefono = models.CharField(max_length=20, blank=True, default='')
     direccion = models.TextField(blank=True, default='')
@@ -29,7 +34,8 @@ class Cliente(models.Model):
     fecha_nacimiento = models.DateField(null=True, blank=True)
     genero = models.CharField(max_length=1, choices=GENERO, default='N')
     profesion = models.CharField(max_length=100, blank=True, verbose_name="Ocupación/Profesión")
-    ingreso_mensual = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    ingreso_mensual = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True,
+                                          verbose_name="Ingreso mensual estimado")
     nivel_educativo = models.CharField(max_length=20, choices=NIVEL_EDUCATIVO, default='secundario')
     score_crediticio_inicial = models.IntegerField(default=500, help_text="Score externo de riesgo al registrarse")
 
@@ -51,6 +57,10 @@ class ConfiguracionSeguridad(models.Model):
     bloqueado_hasta = models.DateTimeField(null=True, blank=True)
     doble_factor_activo = models.BooleanField(default=False)
     #limite_transferencia_diario = models.DecimalField(max_digits=12, decimal_places=2, default=1000.00)
+
+    class Meta:
+        verbose_name = 'Configuración de seguridad'
+        verbose_name_plural = 'Configuraciones de seguridad'
 
     def __str__(self):
         return f"Configuración Seguridad de {self.cliente.usuario.username}"
@@ -84,21 +94,26 @@ class Tarjeta(models.Model):
         ('vencida', 'Vencida'),
     ]
 
-    # Relación 1 a Muchos con Cuenta
-    cuenta = models.ForeignKey(Cuenta, on_delete=models.CASCADE, related_name='tarjetas')
-    
+    cuenta = models.ForeignKey(Cuenta, on_delete=models.PROTECT, related_name='tarjetas')
+
     tipo_tarjeta = models.CharField(max_length=20, choices=TIPO_TARJETA)
-    numero = models.CharField(max_length=16, unique=True)
-    cvv = models.CharField(max_length=4)  # El código de seguridad detrás
+    numero = models.CharField(
+        max_length=16, unique=True,
+        validators=[RegexValidator(r'^\d{16}$', 'El número de tarjeta debe tener exactamente 16 dígitos.')]
+    )
     fecha_expiracion = models.DateField()
-    limite_credito = models.DecimalField(max_digits=12, decimal_places=2, default=0.00) # Por si es de crédito
+    limite_credito = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     saldo_actual = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     estado = models.CharField(max_length=20, choices=ESTADO_TARJETA, default='activa')
 
+    class Meta:
+        verbose_name = 'Tarjeta'
+        verbose_name_plural = 'Tarjetas'
+        ordering = ['-fecha_expiracion']
+
     def __str__(self):
-        # Muestra el tipo y los últimos 4 dígitos para que sea legible y seguro
         unmasked_digits = self.numero[-4:] if len(self.numero) >= 4 else ''
-        return f"Tarjeta {self.tipo_tarjeta.capitalize()} ****{unmasked_digits} - Cuenta {self.cuenta.id}"
+        return f"Tarjeta {self.tipo_tarjeta.capitalize()} ****{unmasked_digits}"
 
 class Prestamo(models.Model):
     ESTADO_PRESTAMO = [('activo', 'Activo'), ('pagado', 'Pagado'), ('vencido', 'Vencida/Mora')]
@@ -110,6 +125,11 @@ class Prestamo(models.Model):
     plazo_meses = models.IntegerField()
     fecha_inicio = models.DateTimeField(auto_now_add=True)
     estado = models.CharField(max_length=20, choices=ESTADO_PRESTAMO, default='activo')
+
+    class Meta:
+        verbose_name = 'Préstamo'
+        verbose_name_plural = 'Préstamos'
+        ordering = ['-fecha_inicio']
 
     def __str__(self):
         return f"Préstamo {self.id} - {self.cliente.usuario.username} - Pendiente: {self.saldo_pendiente}"
@@ -131,6 +151,11 @@ class CuotaPrestamo(models.Model):
     monto_cuota = models.DecimalField(max_digits=12, decimal_places=2)
     fecha_vencimiento = models.DateField()
     estado = models.CharField(max_length=20, choices=ESTADO_CUOTA, default='pendiente')
+
+    class Meta:
+        verbose_name = 'Cuota de préstamo'
+        verbose_name_plural = 'Cuotas de préstamo'
+        ordering = ['prestamo', 'numero_cuota']
 
     def __str__(self):
         return f"Préstamo {self.prestamo.id} - Cuota {self.numero_cuota} ({self.estado})"
@@ -185,6 +210,11 @@ class AlertaFraude(models.Model):
     fecha_alerta = models.DateTimeField(auto_now_add=True)
     accion_tomada = models.CharField(max_length=50, choices=ACCIONES_SISTEMA, default='ninguna')
     resuelta = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = 'Alerta de fraude'
+        verbose_name_plural = 'Alertas de fraude'
+        ordering = ['-fecha_alerta']
 
     def __str__(self):
         estado_resolucion = "Resuelta" if self.resuelta else "Pendiente"

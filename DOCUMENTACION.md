@@ -529,7 +529,11 @@ class Cliente(models.Model):
 
     usuario = models.OneToOneField(User, on_delete=models.CASCADE)
 
-    dni = models.CharField(max_length=8, unique=True, default='', help_text="Documento Nacional de Identidad único")
+    dni = models.CharField(
+        max_length=8, unique=True,
+        validators=[RegexValidator(r'^\d{7,8}$', 'El DNI debe tener 7 u 8 dígitos numéricos.')],
+        help_text="Documento Nacional de Identidad (7 u 8 dígitos)"
+    )
 
     telefono = models.CharField(max_length=20, blank=True, default='')
     direccion = models.TextField(blank=True, default='')
@@ -539,7 +543,8 @@ class Cliente(models.Model):
     fecha_nacimiento = models.DateField(null=True, blank=True)
     genero = models.CharField(max_length=1, choices=GENERO, default='N')
     profesion = models.CharField(max_length=100, blank=True, verbose_name="Ocupación/Profesión")
-    ingreso_mensual = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    ingreso_mensual = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True,
+                                          verbose_name="Ingreso mensual estimado")
     nivel_educativo = models.CharField(max_length=20, choices=NIVEL_EDUCATIVO, default='secundario')
     score_crediticio_inicial = models.IntegerField(default=500, help_text="Score externo de riesgo al registrarse")
 
@@ -685,23 +690,31 @@ class Tarjeta(models.Model):
     TIPO_TARJETA = [('debito', 'Débito'), ('credito', 'Crédito')]
     ESTADO_TARJETA = [('activa', 'Activa'), ('bloqueada', 'Bloqueada'), ('vencida', 'Vencida')]
 
-    cuenta = models.ForeignKey(Cuenta, on_delete=models.CASCADE, related_name='tarjetas')
+    cuenta = models.ForeignKey(Cuenta, on_delete=models.PROTECT, related_name='tarjetas')
     tipo_tarjeta = models.CharField(max_length=20, choices=TIPO_TARJETA)
-    numero = models.CharField(max_length=16, unique=True)
-    cvv = models.CharField(max_length=4)
+    numero = models.CharField(
+        max_length=16, unique=True,
+        validators=[RegexValidator(r'^\d{16}$', 'El número de tarjeta debe tener exactamente 16 dígitos.')]
+    )
     fecha_expiracion = models.DateField()
     limite_credito = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     saldo_actual = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     estado = models.CharField(max_length=20, choices=ESTADO_TARJETA, default='activa')
+
+    class Meta:
+        verbose_name = 'Tarjeta'
+        verbose_name_plural = 'Tarjetas'
+        ordering = ['-fecha_expiracion']
 ```
 
 | Campo | Tipo | ¿Qué guarda? |
 |---|---|---|
 | `cuenta` | ForeignKey(Cuenta) | A qué cuenta está asociada la tarjeta |
-| `numero` | CharField(16, unique) | Número de tarjeta de 16 dígitos |
-| `cvv` | CharField(4) | Código de seguridad trasero |
+| `numero` | CharField(16, unique) | Número de tarjeta de 16 dígitos (validado con regex) |
 | `limite_credito` | DecimalField(12,2) | Límite de crédito (solo para tarjetas de crédito) |
 | `saldo_actual` | DecimalField(12,2) | Saldo disponible o deuda actual |
+
+> ⚠️ **Cambio importante:** Se eliminó el campo `cvv` porque el estándar **PCI DSS** prohíbe almacenar códigos de seguridad de tarjetas, incluso en bases de datos de desarrollo. También se cambió `CASCADE` por `PROTECT` en la relación con Cuenta: no se puede borrar una cuenta que tenga tarjetas asociadas.
 
 ---
 
@@ -757,6 +770,69 @@ class AlertaFraude(models.Model):
 
 **¿Para qué sirve?**
 Cuando el motor de Machine Learning detecta una transacción sospechosa, crea una alerta con un score de riesgo. El sistema puede tomar acciones automáticas (bloquear cuenta, rechazar transacción) y el cliente puede revisarlas después. Relación 1:1 con Transaccion.
+
+---
+
+### Correcciones y mejoras aplicadas a los modelos
+
+#### 🔴 Eliminación de `cvv` en Tarjeta
+
+El campo `cvv` guardaba el código de seguridad de la tarjeta en texto plano. **El estándar PCI DSS prohíbe almacenar CVV**, incluso en entornos de desarrollo. Se eliminó porque:
+- Si el repo se filtra, los CVV quedan expuestos
+- Es ilegal almacenarlos sin certificación PCI DSS
+- Django no puede hashearlos (se necesitan en cada transacción)
+
+#### 🟡 `CASCADE` reemplazado por `PROTECT` en Tarjeta
+
+```python
+# Antes (inseguro):
+cuenta = models.ForeignKey(Cuenta, on_delete=models.CASCADE)
+
+# Después (seguro):
+cuenta = models.ForeignKey(Cuenta, on_delete=models.PROTECT)
+```
+
+Con `CASCADE`, si se borraba una cuenta se eliminaban todas sus tarjetas automáticamente. Con `PROTECT`, Django impide borrar una cuenta que tenga tarjetas asociadas. Es la misma protección que se usa en `Cuenta.cliente` y `Prestamo.cliente`.
+
+#### 🟡 Validadores con `RegexValidator`
+
+```python
+# dni: solo 7 u 8 dígitos numéricos
+validators=[RegexValidator(r'^\d{7,8}$', 'El DNI debe tener 7 u 8 dígitos numéricos.')]
+
+# numero de tarjeta: exactamente 16 dígitos
+validators=[RegexValidator(r'^\d{16}$', 'El número de tarjeta debe tener exactamente 16 dígitos.')]
+```
+
+Django valida automáticamente estos campos antes de guardar en la DB. Si el usuario ingresa un formato inválido, recibe un error sin llegar a la base de datos.
+
+#### 🟡 `dni` ahora es realmente obligatorio
+
+```python
+# Antes (peligroso):
+dni = models.CharField(max_length=8, unique=True, default='')
+
+# Después (correcto):
+dni = models.CharField(max_length=8, unique=True, validators=[...])
+```
+
+Con `default=''` y `unique=True`, dos clientes sin DNI (ej: creados por la señal o desde el admin) causaban un error de unicidad porque ambos tendrían `dni=''`. Ahora es obligatorio siempre.
+
+#### 🟡 `ingreso_mensual` distingue "no especificó" de "cero pesos"
+
+```python
+# Antes:
+ingreso_mensual = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+
+# Después:
+ingreso_mensual = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+```
+
+Con `default=0.00`, un cliente que no completó el campo quedaba registrado con ingreso $0, confundiéndose con alguien que realmente no tiene ingresos. Con `null=True`, queda como `NULL` en la DB, que significa "desconocido".
+
+#### 🟡 `verbose_name` y `verbose_name_plural` en español
+
+Se agregaron a todos los modelos que faltaban (`ConfiguracionSeguridad`, `Tarjeta`, `Prestamo`, `CuotaPrestamo`, `AlertaFraude`). En el admin de Django ahora se muestran como "Tarjetas", "Préstamos", "Alertas de fraude" en vez de los nombres inglés por defecto.
 
 ---
 
