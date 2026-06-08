@@ -36,6 +36,10 @@ class Cliente(models.Model):
     class Meta:
         ordering = ['-fecha_registro']
 
+    @property
+    def nombre(self):
+        return self.usuario.first_name or self.usuario.username
+
     def __str__(self):
         return f"{self.usuario.first_name} {self.usuario.last_name} (DNI: {self.dni})"
     

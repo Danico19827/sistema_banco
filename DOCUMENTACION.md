@@ -70,7 +70,9 @@ Banco/
 │
 ├── infrastructure/          #  App Django principal
 │   ├── models.py            #   Modelos de base de datos
-│   │                        #   (Cliente, Cuenta, Transaccion)
+│   │                        #   (Cliente, Cuenta, Transaccion,
+│   │                        #    Tarjeta, Prestamo, CuotaPrestamo,
+│   │                        #    ConfiguracionSeguridad, AlertaFraude)
 │   ├── forms.py             #   Formulario de registro de clientes
 │   ├── auth_views.py        #   Vistas (login, registro, dashboard, etc.)
 │   ├── signals.py           #   Señales (crear Cliente al crear User)
@@ -511,34 +513,66 @@ En Django, un **modelo** es una clase Python que representa una tabla en la base
 
 ```python
 class Cliente(models.Model):
+    GENERO = [
+        ('M', 'Masculino'),
+        ('F', 'Femenino'),
+        ('N', 'No especifica'),
+    ]
+
+    NIVEL_EDUCATIVO = [
+        ('primario', 'Primario'),
+        ('secundario', 'Secundario'),
+        ('terciario', 'Terciario/Tecnicatura'),
+        ('universitario', 'Universitario'),
+        ('posgrado', 'Posgrado/Master'),
+    ]
+
     usuario = models.OneToOneField(User, on_delete=models.CASCADE)
+
+    dni = models.CharField(max_length=8, unique=True, default='', help_text="Documento Nacional de Identidad único")
+
     telefono = models.CharField(max_length=20, blank=True, default='')
     direccion = models.TextField(blank=True, default='')
     fecha_registro = models.DateTimeField(auto_now_add=True)
     estado = models.CharField(max_length=20, default='activo')
 
+    fecha_nacimiento = models.DateField(null=True, blank=True)
+    genero = models.CharField(max_length=1, choices=GENERO, default='N')
+    profesion = models.CharField(max_length=100, blank=True, verbose_name="Ocupación/Profesión")
+    ingreso_mensual = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    nivel_educativo = models.CharField(max_length=20, choices=NIVEL_EDUCATIVO, default='secundario')
+    score_crediticio_inicial = models.IntegerField(default=500, help_text="Score externo de riesgo al registrarse")
+
     class Meta:
         ordering = ['-fecha_registro']
 
+    @property
+    def nombre(self):
+        return self.usuario.first_name or self.usuario.username
+
     def __str__(self):
-        return f"{self.usuario.first_name} {self.usuario.last_name}"
+        return f"{self.usuario.first_name} {self.usuario.last_name} (DNI: {self.dni})"
 ```
 
-**Campo por campo:**
+**Campo por campo (nuevos respecto a la versión original):**
 
 | Campo | Tipo | ¿Qué guarda? |
 |---|---|---|
-| `usuario` | OneToOneField(User) | Vinculación con el User de Django. Cada cliente es un usuario. |
-| `telefono` | CharField(20) | Número de teléfono (hasta 20 caracteres) |
-| `direccion` | TextField | Dirección física (texto largo sin límite) |
-| `fecha_registro` | DateTimeField(auto_now_add) | Fecha y hora de registro. Se llena SOLO al crear. |
-| `estado` | CharField(20) | Estado del cliente: activo, inactivo, etc. |
+| `dni` | CharField(8, unique) | Documento Nacional de Identidad. Es único y obligatorio. |
+| `fecha_nacimiento` | DateField(null) | Fecha de nacimiento (opcional, para minería de datos) |
+| `genero` | CharField(choices) | M, F o N (No especifica). Para segmentación. |
+| `profesion` | CharField(100) | Ocupación del cliente (opcional) |
+| `ingreso_mensual` | DecimalField(12,2) | Ingreso mensual estimado (para score crediticio) |
+| `nivel_educativo` | CharField(choices) | primario, secundario, terciario, universitario o posgrado |
+| `score_crediticio_inicial` | IntegerField | Puntaje de riesgo asignado externamente al registrar |
 
-> 💡 `blank=True, default=''` significa que el campo no es obligatorio. Esto es importante porque el `Cliente` se crea automáticamente con una **señal** (ver sección 9) y en ese momento no tenemos teléfono ni dirección todavía.
+> 💡 `blank=True, default=''` en teléfono y dirección significa que el campo no es obligatorio. Esto es importante porque el `Cliente` se crea automáticamente con una **señal** (ver sección 9) y en ese momento no tenemos esos datos todavía.
 
 **`class Meta: ordering`:** cuando consultamos clientes, por defecto vienen ordenados del más reciente al más antiguo (`-fecha_registro` = orden descendente).
 
-**`__str__`:** define cómo se muestra un Cliente cuando lo imprimimos. Por ejemplo, si hacemos `print(cliente)` muestra "Juan Pérez".
+**`@property nombre`:** permite acceder al nombre del cliente como `cliente.nombre` (devuelve `first_name` y si está vacío, el `username`). Útil tanto para templates como para datos mock.
+
+**`__str__`:** define cómo se muestra un Cliente cuando lo imprimimos. Por ejemplo, `print(cliente)` muestra "Juan Pérez (DNI: 12345678)".
 
 ---
 
@@ -629,17 +663,168 @@ class Transaccion(models.Model):
 
 ---
 
+### Modelo ConfiguracionSeguridad
+
+```python
+class ConfiguracionSeguridad(models.Model):
+    cliente = models.OneToOneField(Cliente, on_delete=models.CASCADE, related_name='configuracion_seguridad')
+    intentos_fallidos_login = models.IntegerField(default=0)
+    bloqueado_hasta = models.DateTimeField(null=True, blank=True)
+    doble_factor_activo = models.BooleanField(default=False)
+```
+
+**¿Para qué sirve?**
+Controla la seguridad de cada cliente: cuántos intentos de login fallidos tuvo, si está bloqueado temporalmente y si tiene doble factor activado. Relación 1:1 con Cliente (cada cliente tiene exactamente una configuración).
+
+---
+
+### Modelo Tarjeta
+
+```python
+class Tarjeta(models.Model):
+    TIPO_TARJETA = [('debito', 'Débito'), ('credito', 'Crédito')]
+    ESTADO_TARJETA = [('activa', 'Activa'), ('bloqueada', 'Bloqueada'), ('vencida', 'Vencida')]
+
+    cuenta = models.ForeignKey(Cuenta, on_delete=models.CASCADE, related_name='tarjetas')
+    tipo_tarjeta = models.CharField(max_length=20, choices=TIPO_TARJETA)
+    numero = models.CharField(max_length=16, unique=True)
+    cvv = models.CharField(max_length=4)
+    fecha_expiracion = models.DateField()
+    limite_credito = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    saldo_actual = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    estado = models.CharField(max_length=20, choices=ESTADO_TARJETA, default='activa')
+```
+
+| Campo | Tipo | ¿Qué guarda? |
+|---|---|---|
+| `cuenta` | ForeignKey(Cuenta) | A qué cuenta está asociada la tarjeta |
+| `numero` | CharField(16, unique) | Número de tarjeta de 16 dígitos |
+| `cvv` | CharField(4) | Código de seguridad trasero |
+| `limite_credito` | DecimalField(12,2) | Límite de crédito (solo para tarjetas de crédito) |
+| `saldo_actual` | DecimalField(12,2) | Saldo disponible o deuda actual |
+
+---
+
+### Modelo Prestamo
+
+```python
+class Prestamo(models.Model):
+    ESTADO_PRESTAMO = [('activo', 'Activo'), ('pagado', 'Pagado'), ('vencido', 'Vencida/Mora')]
+
+    cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name='prestamos')
+    monto_original = models.DecimalField(max_digits=12, decimal_places=2)
+    saldo_pendiente = models.DecimalField(max_digits=12, decimal_places=2)
+    tasa_interes_anual = models.FloatField()
+    plazo_meses = models.IntegerField()
+    fecha_inicio = models.DateTimeField(auto_now_add=True)
+    estado = models.CharField(max_length=20, choices=ESTADO_PRESTAMO, default='activo')
+```
+
+Los préstamos se pagan en **cuotas**. Cada préstamo tiene varias cuotas, representadas en el modelo `CuotaPrestamo`:
+
+```python
+class CuotaPrestamo(models.Model):
+    ESTADO_CUOTA = [('pendiente', 'Pendiente'), ('pagada', 'Pagada'), ('vencida', 'Vencida')]
+
+    prestamo = models.ForeignKey(Prestamo, on_delete=models.CASCADE, related_name='cuotas')
+    numero_cuota = models.IntegerField()
+    monto_cuota = models.DecimalField(max_digits=12, decimal_places=2)
+    fecha_vencimiento = models.DateField()
+    estado = models.CharField(max_length=20, choices=ESTADO_CUOTA, default='pendiente')
+```
+
+Relación: un **Préstamo** tiene muchas **Cuotas**. Cada cuota tiene su propio vencimiento y estado. `on_delete=models.PROTECT` en Prestamo.cliente evita borrar clientes con préstamos activos.
+
+---
+
+### Modelo AlertaFraude
+
+```python
+class AlertaFraude(models.Model):
+    ACCIONES_SISTEMA = [
+        ('ninguna', 'Ninguna / En revisión'),
+        ('bloqueo_cuenta', 'Bloqueo de Cuenta'),
+        ('notificacion_cliente', 'Notificación Enviada'),
+        ('transaccion_rechazada', 'Transacción Rechazada'),
+    ]
+
+    transaccion = models.OneToOneField(Transaccion, on_delete=models.CASCADE, related_name='alerta')
+    score_riesgo = models.FloatField()
+    fecha_alerta = models.DateTimeField(auto_now_add=True)
+    accion_tomada = models.CharField(max_length=50, choices=ACCIONES_SISTEMA, default='ninguna')
+    resuelta = models.BooleanField(default=False)
+```
+
+**¿Para qué sirve?**
+Cuando el motor de Machine Learning detecta una transacción sospechosa, crea una alerta con un score de riesgo. El sistema puede tomar acciones automáticas (bloquear cuenta, rechazar transacción) y el cliente puede revisarlas después. Relación 1:1 con Transaccion.
+
+---
+
+### Diagrama completo de relaciones
+
+```
+┌──────────────────┐       ┌───────────────────┐       ┌───────────────┐       ┌──────────────────┐
+│      User        │  1:1  │     Cliente       │  1:N  │    Cuenta     │  1:N  │   Transaccion    │
+│   (Django)       │──────>│                   │──────>│               │──────>│                  │
+├──────────────────┤       ├───────────────────┤       ├───────────────┤       ├──────────────────┤
+│ username         │       │ dni (unique)      │       │ tipo_cuenta   │       │ tipo (db_index)  │
+│ password (hash)  │       │ telefono          │       │ saldo         │       │ monto            │
+│ email            │       │ direccion         │       │ moneda        │       │ cuenta_origen    │
+│ first_name       │       │ fecha_registro    │       │ estado        │       │ cuenta_destino   │
+│ last_name        │       │ estado            │       │ limite_diario │       │ fecha_creacion   │
+└──────────────────┘       │ fecha_nacimiento  │       └───────┬───────┘       │ estado (db_index)│
+                           │ genero            │               │              │ riesgo_fraude    │
+                           │ profesion         │               │ 1:N          │ es_fraude        │
+                           │ ingreso_mensual   │               │              └────────┬─────────┘
+                           │ nivel_educativo   │               ▼                       │
+                           │ score_crediticio  │       ┌───────────────┐              │
+                           └────────┬──────────┘       │   Tarjeta    │              │ 1:1
+                                    │                  ├───────────────┤              ▼
+                                    │ 1:1              │ tipo (débito/ │       ┌───────────────┐
+                                    ▼                  │  crédito)     │       │ AlertaFraude  │
+                           ┌───────────────────┐       │ numero (16d)  │       ├───────────────┤
+                           │ ConfiguracionSeg  │       │ cvv           │       │ score_riesgo  │
+                           ├───────────────────┤       │ fecha_exp     │       │ accion_tomada │
+                           │ intentos_fallidos │       │ limite_cred   │       │ resuelta      │
+                           │ bloqueado_hasta   │       │ saldo_actual  │       └───────────────┘
+                           │ doble_factor      │       └───────────────┘
+                           └───────────────────┘
+
+  ┌──────────────────┐
+  │    Prestamo      │  1:N  ┌──────────────┐
+  ├──────────────────┤──────>│ CuotaPrestamo│
+  │ monto_original   │       ├──────────────┤
+  │ saldo_pendiente  │       │ numero_cuota │
+  │ tasa_interes     │       │ monto_cuota  │
+  │ plazo_meses      │       │ fecha_vencim │
+  │ estado           │       │ estado       │
+  └──────────────────┘       └──────────────┘
+```
+
 ### Cómo se relacionan los modelos
 
 ```python
 # Un cliente y sus cuentas
 cliente = Cliente.objects.get(id=1)
 cuentas = cliente.cuentas.all()           # gracias a related_name='cuentas'
+config = cliente.configuracion_seguridad   # 1:1, related_name='configuracion_seguridad'
+prestamos = cliente.prestamos.all()        # gracias a related_name='prestamos'
+
+# Una cuenta y sus tarjetas
+cuenta = Cuenta.objects.get(id=1)
+tarjetas = cuenta.tarjetas.all()           # gracias a related_name='tarjetas'
 
 # Una cuenta y sus transacciones
-cuenta = Cuenta.objects.get(id=1)
 transacciones_salida = cuenta.transacciones_origen.all()    # lo que salió
 transacciones_entrada = cuenta.transacciones_destino.all()  # lo que entró
+
+# Una transacción y su alerta de fraude
+transaccion = Transaccion.objects.get(id=1)
+alerta = transaccion.alerta                # 1:1, puede ser None si no hay alerta
+
+# Un préstamo y sus cuotas
+prestamo = Prestamo.objects.get(id=1)
+cuotas = prestamo.cuotas.all()             # gracias a related_name='cuotas'
 ```
 
 ---
@@ -653,8 +838,22 @@ class RegistroClienteForm(UserCreationForm):
     email = forms.EmailField(required=True)
     first_name = forms.CharField(max_length=30, required=True, label='Nombre')
     last_name = forms.CharField(max_length=30, required=True, label='Apellido')
+
     telefono = forms.CharField(max_length=20, required=True, label='Teléfono')
     direccion = forms.CharField(widget=forms.Textarea(attrs={'rows': 3}), required=True, label='Dirección')
+
+    dni = forms.CharField(max_length=8, required=True, label='DNI',
+                           help_text='Documento Nacional de Identidad (8 dígitos)')
+    fecha_nacimiento = forms.DateField(
+        required=False, label='Fecha de nacimiento',
+        widget=forms.DateInput(attrs={'type': 'date'}),
+    )
+    genero = forms.ChoiceField(choices=Cliente.GENERO, required=False, label='Género')
+    profesion = forms.CharField(max_length=100, required=False, label='Ocupación/Profesión')
+    ingreso_mensual = forms.DecimalField(
+        max_digits=12, decimal_places=2, required=False, label='Ingreso mensual')
+    nivel_educativo = forms.ChoiceField(
+        choices=Cliente.NIVEL_EDUCATIVO, required=False, label='Nivel educativo')
 
     class Meta:
         model = User
@@ -670,6 +869,17 @@ class RegistroClienteForm(UserCreationForm):
             cliente = user.cliente
             cliente.telefono = self.cleaned_data['telefono']
             cliente.direccion = self.cleaned_data['direccion']
+            cliente.dni = self.cleaned_data['dni']
+            if self.cleaned_data.get('fecha_nacimiento'):
+                cliente.fecha_nacimiento = self.cleaned_data['fecha_nacimiento']
+            if self.cleaned_data.get('genero'):
+                cliente.genero = self.cleaned_data['genero']
+            if self.cleaned_data.get('profesion'):
+                cliente.profesion = self.cleaned_data['profesion']
+            if self.cleaned_data.get('ingreso_mensual') is not None:
+                cliente.ingreso_mensual = self.cleaned_data['ingreso_mensual']
+            if self.cleaned_data.get('nivel_educativo'):
+                cliente.nivel_educativo = self.cleaned_data['nivel_educativo']
             cliente.save()
         return user
 ```
@@ -683,26 +893,50 @@ Es un formulario que **ya viene con Django**. Hace automáticamente:
 3. Hashea la contraseña con **PBKDF2** (no guarda la contraseña en texto plano)
 4. Crea el usuario en la base de datos
 
-Nosotros **extendemos** este formulario agregando campos extra: nombre, apellido, email, teléfono y dirección.
+Nosotros **extendemos** este formulario agregando muchos campos extra que se guardan en el User (nombre, apellido, email) y en el Cliente (teléfono, dirección, DNI, fecha de nacimiento, género, profesión, ingreso mensual, nivel educativo).
+
+### Campos nuevos del registro (vs. versión original)
+
+| Campo | ¿Requerido? | ¿Dónde se guarda? |
+|---|---|---|
+| `dni` | Sí (único) | Cliente.dni |
+| `fecha_nacimiento` | No | Cliente.fecha_nacimiento |
+| `genero` | No | Cliente.genero (M/F/N) |
+| `profesion` | No | Cliente.profesion |
+| `ingreso_mensual` | No | Cliente.ingreso_mensual |
+| `nivel_educativo` | No | Cliente.nivel_educativo |
 
 ### Método `save()` explicado
 
 ```python
 def save(self, commit=True):
-    user = super().save(commit=False)     # 1. Crea el usuario EN MEMORIA (no en DB todavía)
-    user.email = self.cleaned_data['email']    # 2. Agrega los campos extra
+    user = super().save(commit=False)          # 1. Crea el usuario EN MEMORIA
+    user.email = self.cleaned_data['email']         # 2. Agrega campos extra al User
     user.first_name = self.cleaned_data['first_name']
     user.last_name = self.cleaned_data['last_name']
     if commit:
-        user.save()                            # 3. Guarda el usuario en DB
-        cliente = user.cliente                 # 4. Obtiene el Cliente (creado por señal)
-        cliente.telefono = self.cleaned_data['telefono']  # 5. Completa teléfono
-        cliente.direccion = self.cleaned_data['direccion'] # 6. Completa dirección
-        cliente.save()                         # 7. Guarda el Cliente actualizado
+        user.save()                                # 3. Guarda el User en DB
+        cliente = user.cliente                     # 4. Obtiene Cliente (creado por señal)
+        cliente.telefono = self.cleaned_data['telefono']     # 5. Campos básicos
+        cliente.direccion = self.cleaned_data['direccion']
+        cliente.dni = self.cleaned_data['dni']               # 6. Campos de minería de datos
+        if self.cleaned_data.get('fecha_nacimiento'):
+            cliente.fecha_nacimiento = self.cleaned_data['fecha_nacimiento']
+        if self.cleaned_data.get('genero'):
+            cliente.genero = self.cleaned_data['genero']
+        if self.cleaned_data.get('profesion'):
+            cliente.profesion = self.cleaned_data['profesion']
+        if self.cleaned_data.get('ingreso_mensual') is not None:
+            cliente.ingreso_mensual = self.cleaned_data['ingreso_mensual']
+        if self.cleaned_data.get('nivel_educativo'):
+            cliente.nivel_educativo = self.cleaned_data['nivel_educativo']
+        cliente.save()                             # 7. Guarda todo
     return user
 ```
 
 **¿Por qué `user.cliente` ya existe?** Porque cuando se ejecuta `user.save()` en el paso 3, la **señal** `post_save` (explicada en la sección 9) crea automáticamente un `Cliente` vacío para ese usuario. Después solo completamos los datos que faltan.
+
+**¿Por qué algunos campos usan `self.cleaned_data.get()` en vez de `self.cleaned_data[]`?** Porque son opcionales. Si el usuario no los completa, no envía el campo en el formulario. `.get()` devuelve `None` si no existe, y el `if` evita pisar el default del modelo con `None`.
 
 ---
 
@@ -881,15 +1115,21 @@ def get_context_data(self, **kwargs):
         cuenta_destino__in=cuentas
     )
     
-    context['cliente'] = {
-        'nombre': cliente.usuario.first_name,
-        'apellido': cliente.usuario.last_name,
-        'email': cliente.usuario.email,
-    }
+    context['cliente'] = cliente               # ← se pasa el modelo directamente
     context['cuentas'] = cuentas
     context['transacciones'] = transacciones.order_by('-fecha_creacion')[:10]
     return context
 ```
+
+**¿Por qué funciona `{{ cliente.nombre }}` en el template con un modelo real?** Porque agregamos la **propiedad** `nombre` en el modelo `Cliente`:
+
+```python
+@property
+def nombre(self):
+    return self.usuario.first_name or self.usuario.username
+```
+
+Esto permite que `cliente.nombre` funcione tanto con el diccionario mock actual como con una instancia real de `Cliente` cuando se migre a datos reales. El template no necesita cambios.
 
 **Diferencia clave:** Hoy los datos están escritos a mano en el código. Cuando sea funcional, los datos vendrán de la base de datos real.
 
