@@ -25,9 +25,9 @@ class RegistroView(CreateView):
 
     def form_valid(self, form):
         with transaction.atomic():
-            user = form.save()
-        login(self.request, user)
-        messages.success(self.request, f'¡Bienvenido {user.first_name}! Tu cuenta fue creada con éxito.')
+            self.object = form.save()
+        login(self.request, self.object)
+        messages.success(self.request, f'¡Bienvenido {self.object.first_name}! Tu cuenta fue creada con éxito.')
         return redirect(self.get_success_url())
 
 
