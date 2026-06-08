@@ -797,14 +797,14 @@ Con `CASCADE`, si se borraba una cuenta se eliminaban todas sus tarjetas automá
 #### 🟡 Validadores con `RegexValidator`
 
 ```python
-# dni: solo 7 u 8 dígitos numéricos
+# dni: solo 7 u 8 dígitos numéricos (en modelo Y formulario)
 validators=[RegexValidator(r'^\d{7,8}$', 'El DNI debe tener 7 u 8 dígitos numéricos.')]
 
-# numero de tarjeta: exactamente 16 dígitos
+# numero de tarjeta: exactamente 16 dígitos (en el modelo)
 validators=[RegexValidator(r'^\d{16}$', 'El número de tarjeta debe tener exactamente 16 dígitos.')]
 ```
 
-Django valida automáticamente estos campos antes de guardar en la DB. Si el usuario ingresa un formato inválido, recibe un error sin llegar a la base de datos.
+El validador de DNI se duplicó **tanto en el modelo como en el formulario** porque Django no ejecuta los validadores del modelo automáticamente al llamar a `save()`. En el formulario se ejecutan durante `is_valid()`, antes de tocar la base de datos. En el modelo sirven como red de seguridad si se crean clientes desde el admin o la shell.
 
 #### 🟡 `dni` ahora es realmente obligatorio
 
@@ -919,7 +919,9 @@ class RegistroClienteForm(UserCreationForm):
     direccion = forms.CharField(widget=forms.Textarea(attrs={'rows': 3}), required=True, label='Dirección')
 
     dni = forms.CharField(max_length=8, required=True, label='DNI',
-                           help_text='Documento Nacional de Identidad (8 dígitos)')
+                           validators=[RegexValidator(r'^\d{7,8}$',
+                                                      'El DNI debe tener 7 u 8 dígitos numéricos.')],
+                           help_text='Documento Nacional de Identidad (7 u 8 dígitos)')
     fecha_nacimiento = forms.DateField(
         required=False, label='Fecha de nacimiento',
         widget=forms.DateInput(attrs={'type': 'date'}),
