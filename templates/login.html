@@ -1,55 +1,46 @@
 {% extends 'base.html' %}
-{% load static %}
-
-{% block title %}Iniciar Sesión - Banco Hexagonal{% endblock %}
-
-{% block extra_css %}
-  <link rel="stylesheet" href="{% static 'css/login_registro.css' %}?v=1.2">
-{% endblock %}
-
+{% block title %}Iniciar sesión - Banco Hexagonal{% endblock %}
 {% block content %}
-<div class="auth-wrapper">
-  <div class="auth-card">
-    <div class="auth-logo">
-      <h2>Banco Hexagonal</h2>
-      <p>Iniciar sesión en tu cuenta</p>
-    </div>
-    
-    <form method="post" class="auth-form" novalidate>
-      {% csrf_token %}
-      
-      <div class="field-group">
-        <label for="id_username">Usuario</label>
-        <input type="text" name="username" id="id_username" 
-               autocomplete="username" 
-               aria-label="Nombre de usuario" required>
-      </div>
-      
-      <div class="field-group">
-        <label for="id_password">Contraseña</label>
-        <input type="password" name="password" id="id_password" 
-               autocomplete="current-password" 
-               aria-label="Contraseña" required>
-      </div>
-      
-      {% if form.non_field_errors %}
+<div class="card">
+  <div class="card-logo">
+    <h1>Banco Hexagonal</h1>
+    <p>Iniciar sesión en tu cuenta</p>
+  </div>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="field-group">
+      <label for="id_username">Usuario</label>
+      <input type="text" name="username" id="id_username"
+             autocomplete="username"
+             aria-label="Nombre de usuario" required>
+      {% if form.username.errors %}
         <ul class="errorlist" role="alert">
-          {% for error in form.non_field_errors %}
-            <li>{{ error }}</li>
-          {% endfor %}
+          {% for error in form.username.errors %}<li>{{ error }}</li>{% endfor %}
         </ul>
       {% endif %}
-      
-      <button type="submit" class="btn-auth-primary">Ingresar</button>
-    </form>
-    
-    <div class="auth-footer-text">
-      ¿No tienes cuenta? <a href="{% url 'registro' %}">Abrir una cuenta</a>
     </div>
-    
-    <div style="text-align: center; margin-top: 1.25rem;">
-      <a href="{% url 'inicio' %}" class="btn-auth-secondary">Volver al inicio</a>
+    <div class="field-group">
+      <label for="id_password">Contraseña</label>
+      <input type="password" name="password" id="id_password"
+             autocomplete="current-password"
+             aria-label="Contraseña" required>
+      {% if form.password.errors %}
+        <ul class="errorlist" role="alert">
+          {% for error in form.password.errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      {% endif %}
     </div>
+    {% if form.non_field_errors %}
+      <ul class="errorlist" role="alert">
+        {% for error in form.non_field_errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    <button type="submit" class="btn btn-primary btn-full">Ingresar</button>
+  </form>
+  <div class="footer-text">
+    ¿No tienes cuenta? <a href="{% url 'registro' %}">Abrir una cuenta</a>
   </div>
 </div>
 {% endblock %}

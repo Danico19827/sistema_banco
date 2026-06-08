@@ -1,133 +1,118 @@
 {% extends 'base.html' %}
-{% load static %}
-
 {% block title %}Abrir cuenta - Banco Hexagonal{% endblock %}
-
-{% block extra_css %}
-  <link rel="stylesheet" href="{% static 'css/login_registro.css' %}?v=1.2">
-{% endblock %}
-
 {% block content %}
-<div class="auth-wrapper">
-  <div class="auth-card">
-    <div class="auth-logo">
-      <h2>Banco Hexagonal</h2>
-      <p>Abrir una cuenta nueva</p>
+<div class="card card-wide">
+  <div class="card-logo">
+    <h1>Banco Hexagonal</h1>
+    <p>Abrir una cuenta nueva</p>
+  </div>
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="field-group">
+      <label for="id_username">Nombre de usuario</label>
+      <input type="text" name="username" id="id_username"
+             autocomplete="username"
+             aria-label="Nombre de usuario"
+             aria-describedby="username-help" required>
+      <span id="username-help" class="help-text">{{ form.username.help_text }}</span>
+      {% if form.username.errors %}
+        <ul class="errorlist" role="alert">
+          {% for error in form.username.errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      {% endif %}
     </div>
-    
-    <form method="post" class="auth-form" novalidate>
-      {% csrf_token %}
-      
+
+    <div class="form-row">
       <div class="field-group">
-        <label for="id_username">Nombre de usuario</label>
-        <input type="text" name="username" id="id_username" 
-               autocomplete="username" 
-               aria-label="Nombre de usuario" 
-               aria-describedby="username-help" required>
-        <span id="username-help" class="help-text">{{ form.username.help_text }}</span>
-        {% if form.username.errors %}
+        <label for="id_first_name">Nombre</label>
+        <input type="text" name="first_name" id="id_first_name"
+               autocomplete="given-name"
+               aria-label="Nombre" required>
+        {% if form.first_name.errors %}
           <ul class="errorlist" role="alert">
-            {% for error in form.username.errors %}<li>{{ error }}</li>{% endfor %}
+            {% for error in form.first_name.errors %}<li>{{ error }}</li>{% endfor %}
           </ul>
         {% endif %}
       </div>
-
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-        <div class="field-group">
-          <label for="id_first_name">Nombre</label>
-          <input type="text" name="first_name" id="id_first_name" 
-                 autocomplete="given-name" 
-                 aria-label="Nombre" required>
-          {% if form.first_name.errors %}
-            <ul class="errorlist" role="alert">
-              {% for error in form.first_name.errors %}<li>{{ error }}</li>{% endfor %}
-            </ul>
-          {% endif %}
-        </div>
-        <div class="field-group">
-          <label for="id_last_name">Apellido</label>
-          <input type="text" name="last_name" id="id_last_name" 
-                 autocomplete="family-name" 
-                 aria-label="Apellido" required>
-          {% if form.last_name.errors %}
-            <ul class="errorlist" role="alert">
-              {% for error in form.last_name.errors %}<li>{{ error }}</li>{% endfor %}
-            </ul>
-          {% endif %}
-        </div>
-      </div>
-
       <div class="field-group">
-        <label for="id_email">Correo electrónico</label>
-        <input type="email" name="email" id="id_email" 
-               autocomplete="email" 
-               aria-label="Correo electrónico" required>
-        {% if form.email.errors %}
+        <label for="id_last_name">Apellido</label>
+        <input type="text" name="last_name" id="id_last_name"
+               autocomplete="family-name"
+               aria-label="Apellido" required>
+        {% if form.last_name.errors %}
           <ul class="errorlist" role="alert">
-            {% for error in form.email.errors %}<li>{{ error }}</li>{% endfor %}
+            {% for error in form.last_name.errors %}<li>{{ error }}</li>{% endfor %}
           </ul>
         {% endif %}
       </div>
-
-      <div class="field-group">
-        <label for="id_telefono">Teléfono</label>
-        <input type="text" name="telefono" id="id_telefono" 
-               autocomplete="tel" 
-               aria-label="Número de teléfono" required>
-        {% if form.telefono.errors %}
-          <ul class="errorlist" role="alert">
-            {% for error in form.telefono.errors %}<li>{{ error }}</li>{% endfor %}
-          </ul>
-        {% endif %}
-      </div>
-
-      <div class="field-group">
-        <label for="id_direccion">Dirección</label>
-        <textarea name="direccion" id="id_direccion" rows="3" 
-                  autocomplete="street-address" 
-                  aria-label="Dirección" required></textarea>
-        {% if form.direccion.errors %}
-          <ul class="errorlist" role="alert">
-            {% for error in form.direccion.errors %}<li>{{ error }}</li>{% endfor %}
-          </ul>
-        {% endif %}
-      </div>
-
-      <div class="field-group">
-        <label for="id_password1">Contraseña</label>
-        <input type="password" name="password1" id="id_password1" 
-               autocomplete="new-password" 
-               aria-label="Contraseña" aria-describedby="password1-help" required>
-        <span id="password1-help" class="help-text">{{ form.password1.help_text }}</span>
-        {% if form.password1.errors %}
-          <ul class="errorlist" role="alert">
-            {% for error in form.password1.errors %}<li>{{ error }}</li>{% endfor %}
-          </ul>
-        {% endif %}
-      </div>
-
-      <div class="field-group">
-        <label for="id_password2">Confirmar contraseña</label>
-        <input type="password" name="password2" id="id_password2" 
-               autocomplete="new-password" 
-               aria-label="Confirmar contraseña" required>
-        {% if form.password2.errors %}
-          <ul class="errorlist" role="alert">
-            {% for error in form.password2.errors %}<li>{{ error }}</li>{% endfor %}
-          </ul>
-        {% endif %}
-      </div>
-
-      <button type="submit" class="btn-auth-primary">Abrir cuenta</button>
-    </form>
-    
-    <div class="auth-footer-text">
-      ¿Ya tienes cuenta? <a href="{% url 'login' %}">Iniciar sesión</a>
     </div>
-    
-    <div style="text-align: center; margin-top: 1.25rem;">
-      <a href="{% url 'inicio' %}" class="btn-auth-secondary">Volver al inicio</a>
+
+    <div class="field-group">
+      <label for="id_email">Correo electrónico</label>
+      <input type="email" name="email" id="id_email"
+             autocomplete="email"
+             aria-label="Correo electrónico" required>
+      {% if form.email.errors %}
+        <ul class="errorlist" role="alert">
+          {% for error in form.email.errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      {% endif %}
     </div>
+
+    <div class="field-group">
+      <label for="id_telefono">Teléfono</label>
+      <input type="text" name="telefono" id="id_telefono"
+             autocomplete="tel"
+             aria-label="Número de teléfono" required>
+      {% if form.telefono.errors %}
+        <ul class="errorlist" role="alert">
+          {% for error in form.telefono.errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+
+    <div class="field-group">
+      <label for="id_direccion">Dirección</label>
+      <textarea name="direccion" id="id_direccion" rows="3"
+                autocomplete="street-address"
+                aria-label="Dirección" required></textarea>
+      {% if form.direccion.errors %}
+        <ul class="errorlist" role="alert">
+          {% for error in form.direccion.errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+
+    <div class="field-group">
+      <label for="id_password1">Contraseña</label>
+      <input type="password" name="password1" id="id_password1"
+             autocomplete="new-password"
+             aria-label="Contraseña" aria-describedby="password1-help" required>
+      <span id="password1-help" class="help-text">{{ form.password1.help_text }}</span>
+      {% if form.password1.errors %}
+        <ul class="errorlist" role="alert">
+          {% for error in form.password1.errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+
+    <div class="field-group">
+      <label for="id_password2">Confirmar contraseña</label>
+      <input type="password" name="password2" id="id_password2"
+             autocomplete="new-password"
+             aria-label="Confirmar contraseña" required>
+      {% if form.password2.errors %}
+        <ul class="errorlist" role="alert">
+          {% for error in form.password2.errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-full">Abrir cuenta</button>
+  </form>
+  <div class="footer-text">
+    ¿Ya tienes cuenta? <a href="{% url 'login' %}">Iniciar sesión</a>
   </div>
 </div>
 {% endblock %}

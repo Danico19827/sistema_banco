@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Mi Cuenta - Banco Hexagonal{% endblock %}
+{% block content %}
+<div class="main-wide">
+  <div class="dashboard-header">
+    <div class="welcome-card">
+      <h2>Hola, {{ cliente.nombre }}!</h2>
+      <p>Resumen de tus cuentas al día de hoy</p>
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem;">
+    <h3 class="section-title" style="margin-bottom: 0;">Tus Cuentas</h3>
+    <a href="{% url 'transferencia' %}" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.8125rem;">Nueva transferencia</a>
+  </div>
+
+  {% if cuentas %}
+    <div class="account-grid">
+      {% for c in cuentas %}
+        <div class="account-card">
+          <div class="account-type">{{ c.tipo }}</div>
+          <div class="account-number">{{ c.numero }}</div>
+          <div class="account-balance">
+            {% if c.moneda == 'USD' %}USD{% else %}${% endif %}
+            {{ c.saldo|floatformat:2|intcomma }}
+          </div>
+          <div class="account-details">
+            <span class="status-badge {{ c.estado }}">{{ c.estado|title }}</span>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="dashboard-empty">
+      <p>No tenés cuentas asociadas todavía.</p>
+    </div>
+  {% endif %}
+
+  <h3 class="section-title">Últimos Movimientos</h3>
+
+  {% if transacciones %}
+    <div class="table-container">
+      <table class="transactions-table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Tipo</th>
+            <th>Descripción</th>
+            <th style="text-align: right;">Monto</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in transacciones %}
+            <tr>
+              <td>{{ t.fecha }}</td>
+              <td>{{ t.tipo }}</td>
+              <td>{{ t.descripcion }}</td>
+              <td class="amount {% if t.monto > 0 %}amount-positive{% else %}amount-negative{% endif %}">
+                {% if t.monto > 0 %}+{% endif %}${{ t.monto|floatformat:2|intcomma }}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="dashboard-empty">
+      <p>No hay movimientos registrados.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

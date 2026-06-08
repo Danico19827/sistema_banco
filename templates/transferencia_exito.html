@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Transferencia Exitosa - Banco Hexagonal{% endblock %}
+{% block content %}
+<div class="card" style="max-width: 520px;">
+  <div style="text-align: center; margin-bottom: 1.5rem;">
+    <div style="width: 56px; height: 56px; background: #f0fff4; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38a169" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+    </div>
+    <h2 style="font-size: 1.25rem; font-weight: 700; color: #22543d; margin-bottom: 0.25rem;">Transferencia exitosa</h2>
+    <p style="font-size: 0.875rem; color: #718096;">Los datos de la operación se detallan a continuación.</p>
+  </div>
+
+  <div style="background: #f7fafc; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #e2e8f0;">
+      <span style="font-size: 0.8125rem; color: #718096;">Cuenta origen</span>
+      <span style="font-size: 0.875rem; font-weight: 600; color: #1a202c;">{{ datos.origen }}</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #e2e8f0;">
+      <span style="font-size: 0.8125rem; color: #718096;">Cuenta destino</span>
+      <span style="font-size: 0.875rem; font-weight: 600; color: #1a202c;">{{ datos.destino }}</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #e2e8f0;">
+      <span style="font-size: 0.8125rem; color: #718096;">Monto</span>
+      <span style="font-size: 1rem; font-weight: 700; color: #e53e3e;">-${{ datos.monto|intcomma }}</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; padding: 0.5rem 0;">
+      <span style="font-size: 0.8125rem; color: #718096;">Concepto</span>
+      <span style="font-size: 0.875rem; font-weight: 500; color: #1a202c;">{{ datos.concepto|default:"Sin especificar" }}</span>
+    </div>
+  </div>
+
+  <p style="font-size: 0.75rem; color: #a0aec0; text-align: center; margin-bottom: 1.25rem;">
+    El comprobante se generará automáticamente cuando el módulo esté habilitado.
+  </p>
+
+  <div style="display: flex; gap: 0.75rem;">
+    <a href="{% url 'dashboard' %}" class="btn btn-primary" style="flex: 1;">Volver al inicio</a>
+    <a href="{% url 'transferencia' %}" class="btn btn-secondary" style="flex: 1;">Nueva transferencia</a>
+  </div>
+</div>
+{% endblock %}

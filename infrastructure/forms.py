@@ -22,10 +22,8 @@ class RegistroClienteForm(UserCreationForm):
         user.last_name = self.cleaned_data['last_name']
         if commit:
             user.save()
-            # Crear el perfil Cliente asociado
-            Cliente.objects.create(
-                usuario=user,
-                telefono=self.cleaned_data['telefono'],
-                direccion=self.cleaned_data['direccion']
-            )
+            cliente = user.cliente
+            cliente.telefono = self.cleaned_data['telefono']
+            cliente.direccion = self.cleaned_data['direccion']
+            cliente.save()
         return user

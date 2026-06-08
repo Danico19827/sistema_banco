@@ -1,66 +1,60 @@
 {% extends 'base.html' %}
-{% load static %}
-
-{% block title %}Inicio - Banco Hexagonal{% endblock %}
-
-{% block extra_css %}
-  <link rel="stylesheet" href="{% static 'css/index.css' %}">
-{% endblock %}
-
+{% block title %}Banco Hexagonal - Seguridad e Innovación{% endblock %}
 {% block content %}
-  <section class="hero">
-    <h1>Tu Futuro Financiero,<br>Seguro y Inteligente.</h1>
-    <p>Con Detección de Fraude y Minería de Datos incorporada en tiempo real.</p>
-  </section>
-
-  <section class="access-container">
-    <div class="access-card">
-      <h3>Accede a tu cuenta</h3>
-      <a href="{% url 'login' %}" class="btn-action primary">Iniciar sesión</a>
+<div class="card card-hero">
+  <div class="card-logo">
+    <h1>Banco Hexagonal</h1>
+    <p>Seguridad, innovación y confianza</p>
+  </div>
+  <h2 class="hero-title">Administrá tu dinero de forma simple y segura</h2>
+  <p class="hero-subtitle">
+    Transferencias rápidas, protección de tus ahorros y una experiencia pensada para vos.
+  </p>
+  {% if user.is_authenticated %}
+    <p style="margin-bottom: 1.5rem; color: #38a169; font-weight: 500; font-size: 0.9375rem;">
+      Bienvenido de nuevo, <strong>{{ user.first_name|default:user.username }}</strong>
+    </p>
+  {% else %}
+    <div class="hero-actions">
+      <a href="{% url 'login' %}" class="btn btn-primary">Iniciar sesión</a>
+      <a href="{% url 'registro' %}" class="btn btn-secondary">Crear una cuenta nueva</a>
     </div>
-    <div class="access-card secondary">
-      <h3>Házte Cliente Ahora</h3>
-      <a href="{% url 'registro' %}" class="btn-action outline">Crear una cuenta nueva</a>
+  {% endif %}
+  <p style="text-align: center; font-size: 0.75rem; color: #9ca3af; margin-top: 1.5rem;">
+    Seguridad y accesibilidad garantizadas &middot; Respaldado por estándares internacionales
+  </p>
+</div>
+
+<div class="features">
+  <div class="feature-card">
+    <div class="feature-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2b6cb0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+        <line x1="1" y1="10" x2="23" y2="10"></line>
+      </svg>
     </div>
-  </section>
-
-  <section class="dashboard-section">
-    <div class="charts-grid">
-      <div class="chart-card">
-        <h4>Flujo de Caja Mensual</h4>
-        <canvas id="chartFlujo" height="180"></canvas>
-      </div>
-
-      <div class="chart-card">
-        <h4>Patrones de Gasto por Categoría</h4>
-        <canvas id="chartGastos" height="180"></canvas>
-      </div>
-
-      <div class="indicators-list">
-        <div class="indicator-box">
-          <p class="title">Tasa interés Promedio</p>
-          <p class="value">1.9%</p>
-        </div>
-        <div class="indicator-box">
-          <p class="title">Tendencias de Mercado</p>
-          <p class="value" style="color: #10b981;">📈</p>
-        </div>
-        <div class="indicator-box">
-          <p class="title">Crecimiento de Ahorros</p>
-          <p class="value" style="color: var(--accent-blue);">+12.4%</p>
-        </div>
-      </div>
+    <h3>Transferencias Seguras</h3>
+    <p>Transferí dinero al instante con la tranquilidad de que tus fondos están siempre protegidos.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2b6cb0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+      </svg>
     </div>
-
-    <div class="features-bar">
-      <div class="feature-item"><span>🧠</span> Inteligencia Artificial Antifraude</div>
-      <div class="feature-item"><span>📉</span> Inversiones Automatizadas</div>
-      <div class="feature-item"><span>🌐</span> Gestión Global de Activos</div>
-      <div class="feature-item"><span>📊</span> Minería de Datos Personalizada</div>
+    <h3>Protección de tu Cuenta</h3>
+    <p>Monitoreamos tu cuenta las 24 horas para detectar y prevenir actividades sospechosas.</p>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2b6cb0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>
     </div>
-  </section>
-{% endblock %}
-
-{% block extra_js %}
-  <script src="{% static 'js/charts_home.js' %}"></script>
+    <h3>Accesibilidad</h3>
+    <p>Una plataforma diseñada para que todos puedan usarla con facilidad, sin importar sus necesidades.</p>
+  </div>
+</div>
 {% endblock %}

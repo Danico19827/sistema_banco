@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Nueva Transferencia - Banco Hexagonal{% endblock %}
+{% block content %}
+<div class="card card-wide">
+  <div class="card-logo">
+    <h1>Nueva Transferencia</h1>
+    <p>Completá los datos para realizar la transferencia</p>
+  </div>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="field-group">
+      <label for="cuenta_origen">Cuenta origen</label>
+      <select name="cuenta_origen" id="cuenta_origen" required>
+        <option value="">Seleccionar cuenta</option>
+        {% for c in cuentas %}
+          <option value="{{ c.id }}">{{ c.tipo }} — {{ c.numero }} ({{ c.moneda }} ${{ c.saldo|floatformat:2|intcomma }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field-group">
+      <label for="cuenta_destino">Cuenta destino</label>
+      <input type="text" name="cuenta_destino" id="cuenta_destino"
+             placeholder="CBU, alias o número de cuenta"
+             autocomplete="off"
+             aria-label="Cuenta destino" required>
+    </div>
+    <div class="field-group">
+      <label for="monto">Monto</label>
+      <input type="number" name="monto" id="monto"
+             step="0.01" min="0.01"
+             placeholder="0.00"
+             autocomplete="off"
+             aria-label="Monto a transferir" required>
+    </div>
+    <div class="field-group">
+      <label for="concepto">Concepto</label>
+      <input type="text" name="concepto" id="concepto"
+             placeholder="Ej: Pago de servicios"
+             autocomplete="off"
+             aria-label="Concepto de la transferencia">
+      <span class="help-text">Opcional: describí el motivo de la transferencia</span>
+    </div>
+    <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
+      <a href="{% url 'dashboard' %}" class="btn btn-secondary" style="flex: 1;">Cancelar</a>
+      <button type="submit" class="btn btn-primary" style="flex: 3;">Transferir</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -4,3 +4,6 @@ class InfrastructureConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'infrastructure'
     label = 'infrastructure'
+
+    def ready(self):
+        import infrastructure.signals

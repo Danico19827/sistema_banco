@@ -18,10 +18,10 @@ class Cliente(models.Model):
 
     usuario = models.OneToOneField(User, on_delete=models.CASCADE)
 
-    dni = models.CharField(max_length=8, unique=True, help_text="Documento Nacional de Identidad único")
+    dni = models.CharField(max_length=8, unique=True, default='', help_text="Documento Nacional de Identidad único")
 
-    telefono = models.CharField(max_length=20)
-    direccion = models.TextField()
+    telefono = models.CharField(max_length=20, blank=True, default='')
+    direccion = models.TextField(blank=True, default='')
     fecha_registro = models.DateTimeField(auto_now_add=True)
     estado = models.CharField(max_length=20, default='activo')
 
@@ -32,7 +32,10 @@ class Cliente(models.Model):
     ingreso_mensual = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     nivel_educativo = models.CharField(max_length=20, choices=NIVEL_EDUCATIVO, default='secundario')
     score_crediticio_inicial = models.IntegerField(default=500, help_text="Score externo de riesgo al registrarse")
-    
+
+    class Meta:
+        ordering = ['-fecha_registro']
+
     def __str__(self):
         return f"{self.usuario.first_name} {self.usuario.last_name} (DNI: {self.dni})"
     
@@ -59,6 +62,9 @@ class Cuenta(models.Model):
     fecha_apertura = models.DateTimeField(auto_now_add=True)
     estado = models.CharField(max_length=20, choices=ESTADO_CUENTA, default='activa')
     limite_transferencia_diario = models.DecimalField(max_digits=12, decimal_places=2, default=1000.00)
+
+    class Meta:
+        ordering = ['-fecha_apertura']
 
     def __str__(self):
         return f"Cuenta {self.id} - {self.cliente.usuario.username}"
@@ -140,15 +146,18 @@ class Transaccion(models.Model):
         ('revertida', 'Revertida'),
     ]
 
-    tipo = models.CharField(max_length=20, choices=TIPO_TRANSACCION)
+    tipo = models.CharField(max_length=20, choices=TIPO_TRANSACCION, db_index=True)
     monto = models.DecimalField(max_digits=12, decimal_places=2)
     cuenta_origen = models.ForeignKey(Cuenta, on_delete=models.PROTECT, related_name='transacciones_origen', null=True, blank=True)
     cuenta_destino = models.ForeignKey(Cuenta, on_delete=models.PROTECT, related_name='transacciones_destino', null=True, blank=True)
-    fecha_creacion = models.DateTimeField(auto_now_add=True)
-    estado = models.CharField(max_length=20, choices=ESTADO_TRANSACCION, default='completada')
+    fecha_creacion = models.DateTimeField(auto_now_add=True, db_index=True)
+    estado = models.CharField(max_length=20, choices=ESTADO_TRANSACCION, default='completada', db_index=True)
     descripcion = models.TextField(blank=True)
     riesgo_fraude = models.FloatField(default=0.0)
     es_fraude_confirmado = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-fecha_creacion']
 
     def __str__(self):
         return f"Transacción {self.id} - {self.tipo} - {self.monto}"
