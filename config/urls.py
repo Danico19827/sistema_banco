@@ -1,12 +1,18 @@
 from django.urls import path
 from django.contrib.auth.views import LogoutView
-from infrastructure.auth_views import InicioView, RegistroView, LoginView, DashboardView, TransferenciaView
+from infrastructure.auth_views import (
+    InicioView, RegistroView, InicioSesionView, PanelView, TransferenciaView,
+    PrestamoListView, PrestamoCrearView, PrestamoDetalleView,
+)
 
 urlpatterns = [
     path('', InicioView.as_view(), name='inicio'),
     path('registro/', RegistroView.as_view(), name='registro'),
-    path('login/', LoginView.as_view(), name='login'),
-    path('logout/', LogoutView.as_view(next_page='inicio'), name='logout'),
-    path('dashboard/', DashboardView.as_view(), name='dashboard'),
+    path('inicio-sesion/', InicioSesionView.as_view(), name='inicio_sesion'),
+    path('cerrar-sesion/', LogoutView.as_view(next_page='inicio'), name='cerrar_sesion'),
+    path('panel/', PanelView.as_view(), name='panel'),
     path('transferencia/', TransferenciaView.as_view(), name='transferencia'),
+    path('prestamos/', PrestamoListView.as_view(), name='prestamos'),
+    path('prestamos/solicitar/', PrestamoCrearView.as_view(), name='prestamos_solicitar'),
+    path('prestamos/<int:pk>/', PrestamoDetalleView.as_view(), name='prestamo_detalle'),
 ]

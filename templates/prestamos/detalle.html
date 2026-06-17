@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Préstamo - Banco Hexagonal{% endblock %}
+{% block content %}
+<div class="card card-wide">
+  <div class="card-logo">
+    <h1>Detalle del Préstamo</h1>
+    <p>Consultá el estado de tus cuotas y realizá pagos</p>
+  </div>
+
+  <div style="background: #f7fafc; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; border: 1px solid #e2e8f0;">
+    <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <div style="font-size: 0.75rem; color: #a0aec0; text-transform: uppercase; letter-spacing: 0.04em;">Monto original</div>
+        <div style="font-weight: 700; font-size: 1.25rem; color: #1a202c;">${{ prestamo.monto_original|floatformat:2|intcomma }}</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: #a0aec0; text-transform: uppercase; letter-spacing: 0.04em;">Saldo pendiente</div>
+        <div style="font-weight: 700; font-size: 1.25rem; color: #e53e3e;">${{ prestamo.saldo_pendiente|floatformat:2|intcomma }}</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: #a0aec0; text-transform: uppercase; letter-spacing: 0.04em;">Sistema</div>
+        <div style="font-weight: 600; font-size: 1rem; color: #1a202c;">{{ prestamo.get_sistema_amortizacion_display }}</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: #a0aec0; text-transform: uppercase; letter-spacing: 0.04em;">Tasa anual</div>
+        <div style="font-weight: 600; font-size: 1rem; color: #1a202c;">{{ prestamo.tasa_interes_anual|floatformat:1 }}%</div>
+      </div>
+      <div>
+        <span class="status-badge {{ prestamo.estado }}">{{ prestamo.get_estado_display }}</span>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem;">Plan de cuotas</h3>
+
+  <div class="table-container">
+    <table class="transactions-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th style="text-align: right;">Monto</th>
+          <th>Vencimiento</th>
+          <th>Estado</th>
+          <th>Pago</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in cuotas %}
+          <tr>
+            <td>{{ c.numero_cuota }}</td>
+            <td class="amount">${{ c.monto_cuota|floatformat:2|intcomma }}</td>
+            <td>{{ c.fecha_vencimiento|date:"d/m/Y" }}</td>
+            <td>
+              <span class="status-badge {{ c.estado }}">{{ c.get_estado_display }}</span>
+              {% if c.fecha_pago %}
+                <div style="font-size: 0.6875rem; color: #a0aec0;">{{ c.fecha_pago|date:"d/m/Y" }}</div>
+              {% endif %}
+            </td>
+            <td>
+              {% if c.estado == 'pendiente' or c.estado == 'vencida' %}
+                <form method="post" novalidate style="display: inline;">
+                  {% csrf_token %}
+                  <input type="hidden" name="cuota_id" value="{{ c.id }}">
+                  <select name="cuenta_id" required style="font-size: 0.75rem; padding: 0.25rem; margin-right: 0.25rem;">
+                    <option value="">Cuenta</option>
+                    {% for cuenta in cuentas %}
+                      <option value="{{ cuenta.id }}">{{ cuenta.get_tipo_cuenta_display }} — ${{ cuenta.saldo|floatformat:2|intcomma }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Pagar</button>
+                </form>
+              {% else %}
+                <span style="font-size: 0.75rem; color: #38a169;">Pagada</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer-text" style="margin-top: 1.5rem;">
+    <a href="{% url 'prestamos' %}">Volver a mis préstamos</a>
+  </div>
+</div>
+{% endblock %}

@@ -13,6 +13,25 @@ body {
   flex-direction: column;
 }
 
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 16px;
+  background: #1a365d;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 0 0 8px 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  z-index: 200;
+  transition: top 0.2s;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
 .header {
   background: #1a365d;
   position: fixed;
@@ -75,6 +94,21 @@ body {
   color: #90cdf4;
   font-size: 0.875rem;
   font-weight: 500;
+}
+
+.nav-logout {
+  background: none;
+  border: none;
+  color: #cbd5e0;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.nav-logout:hover {
+  color: #fff;
 }
 
 .main {

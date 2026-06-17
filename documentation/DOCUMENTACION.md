@@ -59,35 +59,41 @@ Banco/
 │   │                        #   Vincula cada URL con su Vista
 │   ├── wsgi.py / asgi.py    #  Para publicar el sitio en internet
 │
-├── domain/                  #  Capa de dominio (Hexagonal)
-│   ├── entities/            #   Entidades de negocio puras (vacíos)
-│   ├── ports/               #   Interfaces abstractas (vacíos)
-│   └── reglas/              #   Reglas de negocio (vacíos)
-│   ── ── ── ── ──          #   Por ahora solo estructura
+├── domain/                  #  Capa de dominio (Hexagonal - IMPLEMENTADO)
+│   ├── entities.py           #   Entidades de negocio puras (dataclases)
+│   ├── ports.py              #   Interfaces abstractas (RepositorioCuenta, etc.)
+│   └── rules.py             #   Reglas de negocio: validar_saldo, simular_cuotas
 │
-├── application/             #  Casos de uso (Hexagonal)
-│   ── ── ── ── ──          #   Vacío, se implementará después
+├── application/              #  Casos de uso (Hexagonal - IMPLEMENTADO)
+│   └── use_cases.py          #   RealizarTransferencia, SolicitarPrestamo, PagarCuota
 │
-├── infrastructure/          #  App Django principal
-│   ├── models.py            #   Modelos de base de datos
-│   │                        #   (Cliente, Cuenta, Transaccion,
-│   │                        #    Tarjeta, Prestamo, CuotaPrestamo,
-│   │                        #    ConfiguracionSeguridad, AlertaFraude)
-│   ├── forms.py             #   Formulario de registro de clientes
-│   ├── auth_views.py        #   Vistas (login, registro, dashboard, etc.)
-│   ├── signals.py           #   Señales (crear Cliente al crear User)
-│   ├── app.py               #   Configuración de la app
-│   ├── adapters/            #   Adaptadores hexagonales (vacíos)
-│   └── migrations/          #   Historial de cambios en la DB
+├── infrastructure/            #  App Django principal
+│   ├── models.py              #   Modelos de base de datos
+│   │                          #   (Cliente, Cuenta, Transaccion,
+│   │                          #    Tarjeta, Prestamo, CuotaPrestamo,
+│   │                          #    ConfiguracionSeguridad, AlertaFraude)
+│   ├── forms.py               #   Formulario de registro de clientes
+│   ├── auth_views.py          #   Vistas (login, registro, dashboard,
+│   │                          #    transferencia, préstamos)
+│   ├── signals.py             #   Señales (crear Cliente al crear User)
+│   ├── apps.py                #   Configuración de la app
+│   ├── adapters/              #   Adaptadores hexagonales (IMPLEMENTADOS)
+│   │   ├── __init__.py
+│   │   └── repositories.py    #   DjangoCuentaRepository, etc.
+│   └── migrations/            #   Historial de cambios en la DB
 │
 ├── templates/               #  Plantillas HTML
-│   ├── base.html            #   Plantilla base (header, nav, footer)
+│   ├── base.html            #   Plantilla base (header, nav, footer, skip link)
 │   ├── inicio.html          #   Landing page (página de bienvenida)
 │   ├── login.html           #   Inicio de sesión
 │   ├── registro.html        #   Registro de nuevo cliente
 │   ├── dashboard.html       #   Panel principal del cliente
 │   ├── transferencia.html   #   Formulario de transferencia
-│   └── transferencia_exito.html  #  Confirmación de transferencia
+│   ├── transferencia_exito.html  #  Confirmación de transferencia
+│   └── prestamos/           #   Vistas de préstamos
+│       ├── lista.html       #     Lista de préstamos del cliente
+│       ├── solicitar.html   #     Simulación y solicitud
+│       └── detalle.html     #     Detalle y pago de cuotas
 │
 ├── static/
 │   └── css/
@@ -116,21 +122,21 @@ Django organiza el código en "apps". Cada app es un módulo que hace una cosa e
 
 ## 3. El ciclo de vida de una solicitud (Request)
 
-Cuando un usuario escribe una URL en el navegador, pasan varias cosas antes de que vea la página. Veamos el ejemplo de cuando alguien entra a `/login/`:
+Cuando un usuario escribe una URL en el navegador, pasan varias cosas antes de que vea la página. Veamos el ejemplo de cuando alguien entra a `/inicio-sesion/`:
 
 ```
  PASO 1                          PASO 2                          PASO 3
 ┌──────────────┐           ┌──────────────┐           ┌──────────────────┐
 │ Usuario      │  escribe  │  Django      │  busca en  │  config/urls.py  │
 │ escribe      │ ────────> │  recibe el   │ ────────> │                  │
-│ /login/      │           │  pedido      │           │  'login/' →      │
-│              │           │              │           │  LoginView       │
+│ /inicio-sesion/      │           │  pedido      │           │  'login/' →      │
+│              │           │              │           │  InicioSesionView       │
 └──────────────┘           └──────────────┘           └────────┬─────────┘
                                                                │
                                                                ▼
  PASO 4                          PASO 5                          PASO 6
 ┌──────────────────────┐    ┌───────────────┐            ┌───────────────┐
-│ LoginView            │    │  LoginView     │            │  Django       │
+│ InicioSesionView            │    │  InicioSesionView     │            │  Django       │
 │ (en auth_views.py)   │    │  obtiene       │            │  completa     │
 │                      │    │  datos         │            │  el template  │
 │ Ejecuta el código    │ ──>│  y elige       │ ─────────> │  con los      │
@@ -150,10 +156,10 @@ Cuando un usuario escribe una URL en el navegador, pasan varias cosas antes de q
 
 ### Explicación paso a paso
 
-1. **El navegador** hace un pedido (request) a `http://localhost:8000/login/`
+1. **El navegador** hace un pedido (request) a `http://localhost:8000/inicio-sesion/`
 2. **Django** recibe el pedido y busca qué hacer con esa URL
-3. **`urls.py`** es como una guía telefónica: dice "cuando alguien entre a `login/`, ejecutá la vista `LoginView`"
-4. **La vista `LoginView`** se ejecuta. Si es un GET (entrar a la página), muestra el formulario vacío. Si es un POST (enviar el formulario), valida los datos.
+3. **`urls.py`** es como una guía telefónica: dice "cuando alguien entre a `login/`, ejecutá la vista `InicioSesionView`"
+4. **La vista `InicioSesionView`** se ejecuta. Si es un GET (entrar a la página), muestra el formulario vacío. Si es un POST (enviar el formulario), valida los datos.
 5. **La vista** prepara los datos y elige qué template HTML usar
 6. **Django** combina el template HTML (login.html) con los datos (el formulario, errores, etc.)
 7. **Django devuelve** una página HTML completa al navegador
@@ -170,15 +176,18 @@ Archivo: `config/urls.py`
 ```python
 from django.urls import path
 from django.contrib.auth.views import LogoutView
-from infrastructure.auth_views import InicioView, RegistroView, LoginView, DashboardView, TransferenciaView
+from infrastructure.auth_views import InicioView, RegistroView, InicioSesionView, PanelView, TransferenciaView
 
 urlpatterns = [
     path('', InicioView.as_view(), name='inicio'),
     path('registro/', RegistroView.as_view(), name='registro'),
-    path('login/', LoginView.as_view(), name='login'),
-    path('logout/', LogoutView.as_view(next_page='inicio'), name='logout'),
-    path('dashboard/', DashboardView.as_view(), name='dashboard'),
+    path('inicio-sesion/', InicioSesionView.as_view(), name='inicio_sesion'),
+    path('cerrar-sesion/', LogoutView.as_view(next_page='inicio'), name='cerrar_sesion'),
+    path('panel/', PanelView.as_view(), name='panel'),
     path('transferencia/', TransferenciaView.as_view(), name='transferencia'),
+    path('prestamos/', PrestamoListView.as_view(), name='prestamos'),
+    path('prestamos/solicitar/', PrestamoCrearView.as_view(), name='prestamos_solicitar'),
+    path('prestamos/<int:pk>/', PrestamoDetalleView.as_view(), name='prestamo_detalle'),
 ]
 ```
 
@@ -192,14 +201,17 @@ urlpatterns = [
 
 | Ruta | Vista | Template | ¿Requiere login? | ¿Qué hace? |
 |---|---|---|---|---|
-| `/` | `InicioView` | `inicio.html` | No | Landing page. Si ya estás logueado, redirige al dashboard |
-| `/registro/` | `RegistroView` | `registro.html` | No | Muestra formulario de alta. Al enviar, crea usuario y redirige al dashboard |
-| `/login/` | `LoginView` | `login.html` | No | Muestra formulario de login. Al enviar, inicia sesión y redirige al dashboard |
-| `/logout/` | `LogoutView` | — | Sí | Cierra la sesión y redirige al inicio |
-| `/dashboard/` | `DashboardView` | `dashboard.html` | **Sí** | Muestra saldos, cuentas y movimientos |
-| `/transferencia/` | `TransferenciaView` | `transferencia.html` | **Sí** | Muestra formulario de transferencia. Al enviar, muestra pantalla de éxito |
+| `/` | `InicioView` | `inicio.html` | No | Landing page. Si ya estás logueado, redirige al panel |
+| `/registro/` | `RegistroView` | `registro.html` | No | Muestra formulario de alta. Al enviar, crea usuario y redirige al panel |
+| `/inicio-sesion/` | `InicioSesionView` | `login.html` | No | Muestra formulario de login. Al enviar, inicia sesión y redirige al panel |
+| `/cerrar-sesion/` | `LogoutView` | — | Sí | Cierra la sesión (POST con CSRF) y redirige al inicio |
+| `/panel/` | `PanelView` | `dashboard.html` | **Sí** | Muestra saldos, cuentas, movimientos y préstamos activos |
+| `/transferencia/` | `TransferenciaView` | `transferencia.html` | **Sí** | Muestra formulario de transferencia. Al enviar, ejecuta caso de uso hexagonal |
+| `/prestamos/` | `PrestamoListView` | `prestamos/lista.html` | **Sí** | Lista todos los préstamos del cliente |
+| `/prestamos/solicitar/` | `PrestamoCrearView` | `prestamos/solicitar.html` | **Sí** | Simula y solicita un nuevo préstamo |
+| `/prestamos/<id>/` | `PrestamoDetalleView` | `prestamos/detalle.html` | **Sí** | Detalle del préstamo y pago de cuotas |
 
-> 💡 **Concepto clave:** Las rutas marcadas con **"Sí"** en "¿Requiere login?" usan `LoginRequiredMixin`. Si un usuario no logueado intenta entrar, Django lo redirige automáticamente a `/login/`.
+> 💡 **Concepto clave:** Las rutas marcadas con **"Sí"** en "¿Requiere login?" usan `LoginRequiredMixin`. Si un usuario no logueado intenta entrar, Django lo redirige automáticamente a `/inicio-sesion/`.
 
 ---
 
@@ -226,7 +238,7 @@ class InicioView(TemplateView):
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            return redirect('dashboard')
+            return redirect('panel')
         return super().dispatch(request, *args, **kwargs)
 ```
 
@@ -234,10 +246,10 @@ class InicioView(TemplateView):
 - `TemplateView` es la vista más simple de Django: solo muestra un template HTML
 - `template_name = 'inicio.html'` le dice a Django qué archivo HTML usar
 - `dispatch()` se ejecuta **siempre**, antes que cualquier otro método:
-  - Si el usuario **ya está logueado** (`request.user.is_authenticated`), lo redirige al dashboard
+  - Si el usuario **ya está logueado** (`request.user.is_authenticated`), lo redirige al panel
   - Si **no está logueado**, muestra la landing page normalmente
 
-**Ejemplo concreto:** Si un usuario logueado escribe `/` en el navegador, automáticamente va a parar a `/dashboard/`.
+**Ejemplo concreto:** Si un usuario logueado escribe `/` en el navegador, automáticamente va a parar a `/panel/`.
 
 ---
 
@@ -247,7 +259,7 @@ class InicioView(TemplateView):
 class RegistroView(CreateView):
     form_class = RegistroClienteForm
     template_name = 'registro.html'
-    success_url = reverse_lazy('dashboard')
+    success_url = reverse_lazy('panel')
 
     def form_valid(self, form):
         with transaction.atomic():
@@ -267,14 +279,14 @@ class RegistroView(CreateView):
 2. `form.save()`: guarda el usuario en la base de datos
 3. `login(self.request, user)`: inicia sesión automáticamente (el usuario no tiene que loguearse después de registrarse)
 4. `messages.success()`: muestra un mensaje verde de bienvenida
-5. `redirect()`: redirige al dashboard
+5. `redirect()`: redirige al panel
 
 ---
 
-### LoginView
+### InicioSesionView
 
 ```python
-class LoginView(BaseLoginView):
+class InicioSesionView(BaseLoginView):
     template_name = 'login.html'
 
     def form_valid(self, form):
@@ -293,34 +305,43 @@ class LoginView(BaseLoginView):
 - Validar que el usuario existe
 - Verificar que la contraseña es correcta
 - Crear la sesión
-- Redirigir al dashboard
+- Redirigir al panel
 
 ---
 
-### DashboardView
+### PanelView
 
 ```python
-class DashboardView(LoginRequiredMixin, TemplateView):
+class PanelView(LoginRequiredMixin, TemplateView):
     template_name = 'dashboard.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # ... datos mock ...
-        context['cliente'] = mock_cliente
-        context['cuentas'] = mock_cuentas
-        context['transacciones'] = mock_transacciones
+
+        cliente = self.request.user.cliente
+        cuentas = cliente.cuentas.all()
+        cuentas_ids = list(cuentas.values_list('id', flat=True))
+        transacciones = Transaccion.objects.filter(
+            Q(cuenta_origen__in=cuentas) | Q(cuenta_destino__in=cuentas)
+        ).order_by('-fecha_creacion')[:10]
+        prestamos = Prestamo.objects.filter(cliente=cliente).order_by('-fecha_inicio')[:5]
+
+        context['cliente'] = cliente
+        context['cuentas'] = cuentas
+        context['cuentas_ids'] = cuentas_ids
+        context['transacciones'] = transacciones
+        context['prestamos'] = prestamos
         return context
 ```
 
 **¿Qué hace?**
 - `LoginRequiredMixin`: si el usuario no está logueado, lo redirige al login automáticamente
-- `get_context_data()`: prepara los datos que se van a mostrar en el template
-
-**¿Qué son los datos mock?** Son datos inventados (ver sección 11). Cuando el sistema sea funcional, `mock_cuentas` se reemplazará por consultas reales a la base de datos.
+- `get_context_data()`: consulta la base de datos real (ya no usa datos mock). Obtiene el Cliente, sus Cuentas, las últimas 10 Transacciones y sus Préstamos activos.
+- El dashboard muestra alias, CVU, saldo, movimientos con signo (+entrada / -salida) y una sección de préstamos.
 
 ---
 
-### TransferenciaView
+### TransferenciaView (POST usa hexagonal)
 
 ```python
 class TransferenciaView(LoginRequiredMixin, TemplateView):
@@ -328,28 +349,104 @@ class TransferenciaView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['cuentas'] = [
-            {'id': 1, 'tipo': 'Caja de Ahorro', 'numero': '**** 4521', 'saldo': 125430.50, 'moneda': 'ARS'},
-            {'id': 2, 'tipo': 'Cuenta Corriente', 'numero': '**** 7890', 'saldo': 8750.00, 'moneda': 'USD'},
-        ]
+        context['cuentas'] = self.request.user.cliente.cuentas.filter(estado='activa')
         return context
 
     def post(self, request, *args, **kwargs):
-        # Procesa el formulario cuando se envía
-        datos = {
-            'origen': ...,
-            'destino': request.POST.get('cuenta_destino', ''),
-            'monto': request.POST.get('monto', '0.00'),
-            'concepto': request.POST.get('concepto', ''),
-        }
-        return render(request, 'transferencia_exito.html', {'datos': datos})
+        # Parsea la entrada del formulario...
+        with transaction.atomic():
+            repo_cuenta = DjangoCuentaRepository()
+            repo_tx = DjangoTransaccionRepository()
+            caso = RealizarTransferencia(repo_cuenta, repo_tx)
+            resultado = caso.ejecutar(origen_id, destino_raw, monto, concepto)
+        # ...
 ```
 
-**¿Qué hace?**
-- **GET** (entrar a la página): muestra el formulario de transferencia
-- **POST** (enviar el formulario): procesa los datos y muestra la pantalla de éxito
+**¿Qué hace diferente?**
+- **GET**: muestra las cuentas activas del cliente desde la DB real
+- **POST**: usa el **caso de uso hexagonal** `RealizarTransferencia` en lugar de manipular el ORM directamente. La lógica de negocio (validar saldo, cuenta destino, transferir) está en `application/use_cases.py` y `domain/rules.py`, separada de Django.
+- La transferencia busca la cuenta destino por **alias, CVU, número de cuenta o ID**.
 
-`request.POST.get('campo')` obtiene el valor que el usuario escribió en el campo del formulario.
+---
+
+### PrestamoListView
+
+```python
+class PrestamoListView(LoginRequiredMixin, ListView):
+    template_name = 'prestamos/lista.html'
+    context_object_name = 'prestamos'
+
+    def get_queryset(self):
+        return Prestamo.objects.filter(
+            cliente=self.request.user.cliente
+        ).order_by('-fecha_inicio')
+```
+
+**¿Qué hace?** Lista todos los préstamos del cliente autenticado, del más reciente al más antiguo. Cada préstamo muestra: monto original, saldo pendiente, sistema de amortización y estado.
+
+---
+
+### PrestamoCrearView (solicitar préstamo)
+
+```python
+class PrestamoCrearView(LoginRequiredMixin, TemplateView):
+    template_name = 'prestamos/solicitar.html'
+
+    def post(self, request, *args, **kwargs):
+        accion = request.POST.get('accion', '')
+        # ...
+        if accion == 'simular':
+            use_case = SolicitarPrestamo(repo_prestamo, repo_cuenta)
+            cuotas = use_case.simular(monto, plazo, sistema)
+            # Muestra la tabla de cuotas simuladas (francés o alemán)
+
+        elif accion == 'confirmar':
+            use_case = SolicitarPrestamo(repo_prestamo, repo_cuenta)
+            prestamo, mensaje = use_case.ejecutar(cliente_id, monto, plazo, sistema)
+            # Crea el préstamo y acredita el monto en la cuenta
+```
+
+**Flujo:** El usuario ingresa monto, plazo y sistema (francés/alemán) → presiona "Simular" → ve tabla de cuotas con interés y amortización → presiona "Confirmar" → se crea el préstamo y se acredita el monto.
+
+---
+
+### PrestamoDetalleView (pagar cuotas)
+
+```python
+class PrestamoDetalleView(LoginRequiredMixin, DetailView):
+    template_name = 'prestamos/detalle.html'
+
+    def post(self, request, *args, **kwargs):
+        # Pago de cuota individual con PagarCuota (caso de uso hexagonal)
+        use_case = PagarCuota(repo_prestamo, repo_cuenta)
+        ok, mensaje = use_case.ejecutar(cuota_id, cuenta_id, cliente_id)
+```
+
+**¿Qué hace?** Muestra el detalle del préstamo con tabla de cuotas (número, monto, vencimiento, estado). Cada cuota pendiente tiene un botón "Pagar" que debita de la cuenta seleccionada y marca la cuota como pagada. Actualiza el saldo pendiente del préstamo.
+
+---
+
+### ¿Cómo encajan las vistas con la arquitectura hexagonal?
+
+```
+┌──────────────────────────┐     ┌───────────────────────────┐     ┌──────────────────────┐
+│ Django View (MTV)       │────>│ Caso de Uso (Application)  │────>│ Puerto (Interface)    │
+│ TransferenciaView POST  │     │ RealizarTransferencia      │     │ RepositorioCuenta    │
+│ PrestamoCrearView POST  │     │ SolicitarPrestamo          │     │ RepositorioPrestamo  │
+│ PrestamoDetalleView POST│     │ PagarCuota                 │     │                      │
+└──────────────────────────┘     └───────────────────────────┘     └──────────┬───────────┘
+                                                                            │
+                                                                            ▼
+                                                              ┌──────────────────────────┐
+                                                              │ Adaptador (Infraest.)    │
+                                                              │ DjangoCuentaRepository   │
+                                                              │ Implementa el puerto     │
+                                                              │ usando Django ORM +      │
+                                                              │ select_for_update()      │
+                                                              └──────────────────────────┘
+```
+
+Las vistas de **registro, login y dashboard** usan MTV clásico (no pasan por casos de uso, solo consultan el ORM directamente). Las vistas de **transferencia y préstamos** usan hexagonal: la vista recibe datos del formulario, instancia el caso de uso, y éste orquesta puertos y adaptadores.
 
 ---
 
@@ -379,9 +476,9 @@ Tenemos un archivo `base.html` que contiene la estructura común de todas las p�
       <a href="{% url 'inicio' %}">Inicio</a>
       {% if user.is_authenticated %}
         <span class="nav-user">{{ user.username }}</span>
-        <a href="{% url 'logout' %}">Cerrar sesión</a>
+        <a href="{% url 'cerrar_sesion' %}">Cerrar sesión</a>
       {% else %}
-        <a href="{% url 'login' %}">Iniciar sesión</a>
+        <a href="{% url 'inicio_sesion' %}">Iniciar sesión</a>
         <a href="{% url 'registro' %}">Abrir cuenta</a>
       {% endif %}
     </nav>
@@ -412,7 +509,7 @@ Tenemos un archivo `base.html` que contiene la estructura común de todas las p�
 | `{% block title %}` | Define una zona que las páginas hijas pueden llenar con su propio título |
 | `{% load static %}` | Carga los archivos estáticos (CSS, imágenes) |
 | `{% static 'css/estilo.css' %}` | Genera la URL correcta hacia el archivo CSS |
-| `{% url 'login' %}` | Genera la URL de la ruta llamada 'login' |
+| `{% url 'inicio_sesion' %}` | Genera la URL de la ruta llamada 'inicio_sesion' |
 | `{% if user.is_authenticated %}` | Muestra cosas diferentes si el usuario está o no logueado |
 | `{{ user.username }}` | Muestra el nombre de usuario |
 | `{% if messages %}` | Muestra mensajes flash (si hay) |
@@ -435,7 +532,7 @@ Es como si `base.html` fuera un **molde** y cada página solo completa los hueco
 
 ### Variables en templates
 
-Las vistas pasan datos a los templates a través de un diccionario. Por ejemplo, en `DashboardView`:
+Las vistas pasan datos a los templates a través de un diccionario. Por ejemplo, en `PanelView`:
 
 ```python
 context = {
@@ -590,8 +687,11 @@ class Cuenta(models.Model):
 
     cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name='cuentas')
     tipo_cuenta = models.CharField(max_length=20, choices=TIPO_CUENTA)
+    numero_cuenta = models.CharField(max_length=20, unique=True, null=True, blank=True, editable=False)
+    alias = models.CharField(max_length=20, unique=True, null=True, blank=True)
+    cvu = models.CharField(max_length=22, unique=True, null=True, blank=True)
     saldo = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    moneda = models.CharField(max_length=3, default='USD')
+    moneda = models.CharField(max_length=3, default='ARS')
     fecha_apertura = models.DateTimeField(auto_now_add=True)
     estado = models.CharField(max_length=20, choices=ESTADO_CUENTA, default='activa')
     limite_transferencia_diario = models.DecimalField(max_digits=12, decimal_places=2, default=1000.00)
@@ -599,8 +699,13 @@ class Cuenta(models.Model):
     class Meta:
         ordering = ['-fecha_apertura']
 
+    def save(self, *args, **kwargs):
+        if not self.numero_cuenta:
+            self.numero_cuenta = uuid.uuid4().hex[:12].upper()
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"Cuenta {self.id} - {self.cliente.usuario.username}"
+        return f"Cuenta {self.numero_cuenta} - {self.cliente.usuario.username}"
 ```
 
 **Campo por campo:**
@@ -609,8 +714,11 @@ class Cuenta(models.Model):
 |---|---|---|
 | `cliente` | ForeignKey(Cliente) | ¿De quién es esta cuenta? `related_name='cuentas'` permite hacer `cliente.cuentas.all()` |
 | `tipo_cuenta` | CharField(choices) | "ahorro" o "corriente" |
+| `numero_cuenta` | CharField(20, unique) | Número único de 12 caracteres generado automáticamente con UUID |
+| `alias` | CharField(20, unique, null) | Nombre corto definido por el usuario para identificar la cuenta (ej: "mi.sueldo") |
+| `cvu` | CharField(22, unique, null) | Clave Virtual Uniforme de 22 dígitos (estándar BCRA) |
 | `saldo` | DecimalField(12,2) | Dinero disponible. 12 dígitos, 2 decimales. |
-| `moneda` | CharField(3) | ARS (pesos) o USD (dólares) |
+| `moneda` | CharField(3) | ARS (pesos) o USD (dólares). Por defecto ARS. |
 | `estado` | CharField(choices) | "activa", "inactiva" o "bloqueada" |
 | `limite_transferencia_diario` | DecimalField(12,2) | Máximo que se puede transferir por día |
 
@@ -723,12 +831,14 @@ class Tarjeta(models.Model):
 ```python
 class Prestamo(models.Model):
     ESTADO_PRESTAMO = [('activo', 'Activo'), ('pagado', 'Pagado'), ('vencido', 'Vencida/Mora')]
+    SISTEMA_AMORTIZACION = [('frances', 'Francés'), ('aleman', 'Alemán')]
 
     cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name='prestamos')
     monto_original = models.DecimalField(max_digits=12, decimal_places=2)
     saldo_pendiente = models.DecimalField(max_digits=12, decimal_places=2)
     tasa_interes_anual = models.FloatField()
     plazo_meses = models.IntegerField()
+    sistema_amortizacion = models.CharField(max_length=20, choices=SISTEMA_AMORTIZACION, default='frances')
     fecha_inicio = models.DateTimeField(auto_now_add=True)
     estado = models.CharField(max_length=20, choices=ESTADO_PRESTAMO, default='activo')
 ```
@@ -743,6 +853,8 @@ class CuotaPrestamo(models.Model):
     numero_cuota = models.IntegerField()
     monto_cuota = models.DecimalField(max_digits=12, decimal_places=2)
     fecha_vencimiento = models.DateField()
+    fecha_pago = models.DateField(null=True, blank=True)
+    monto_pagado = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     estado = models.CharField(max_length=20, choices=ESTADO_CUOTA, default='pendiente')
 ```
 
@@ -1029,27 +1141,25 @@ Una señal es código que se ejecuta **automáticamente** cuando ocurre un event
 Archivo: `infrastructure/signals.py`
 
 ```python
+import uuid
 from django.db.models.signals import post_save
 from django.contrib.auth.models import User
 from django.dispatch import receiver
-from .models import Cliente
+from .models import Cliente, Cuenta, ConfiguracionSeguridad
 
 @receiver(post_save, sender=User)
-def crear_cliente(sender, instance, created, **kwargs):
+def crear_perfil_cliente(sender, instance, created, **kwargs):
     if created:
-        Cliente.objects.create(usuario=instance)
+        dni_temporal = uuid.uuid4().hex[:8]
+        cliente = Cliente.objects.create(usuario=instance, dni=dni_temporal)
+        Cuenta.objects.create(cliente=cliente, tipo_cuenta='ahorro', moneda='ARS')
+        ConfiguracionSeguridad.objects.create(cliente=cliente)
 ```
 
-**¿Qué significa cada parte?**
-
-| Parte | Significado |
-|---|---|
-| `@receiver` | Decorador que registra esta función como una señal |
-| `post_save` | Evento: "después de guardar" algo |
-| `sender=User` | ¿Qué cosa se guardó? Un User |
-| `instance` | El User que se acaba de guardar |
-| `created` | True si es NUEVO, False si solo se actualizó |
-| `Cliente.objects.create(usuario=instance)` | Crea un Cliente vinculado a ese User |
+**¿Qué hace ahora (versión actualizada)?**
+- **Cliente**: crea con un DNI temporal único (UUID de 8 caracteres). El formulario de registro pisa este DNI con el real después.
+- **Cuenta**: crea automáticamente una cuenta de ahorro en pesos (el `numero_cuenta` se autogenera en `save()`).
+- **ConfiguracionSeguridad**: crea la configuración de seguridad por defecto (sin 2FA, sin bloqueo).
 
 **Flujo completo:**
 
@@ -1057,8 +1167,8 @@ def crear_cliente(sender, instance, created, **kwargs):
 1. Alguien crea un User (desde el registro, desde el admin, desde la terminal)
 2. Django guarda el User en la base de datos
 3. Inmediatamente después, Django ejecuta la señal
-4. La señal crea un Cliente con ese usuario (teléfono y dirección vacíos)
-5. Si el User se creó desde el formulario de registro, después el formulario completa teléfono y dirección
+4. La señal crea un Cliente (con DNI temporal), una Cuenta (ahorro en ARS) y una ConfiguracionSeguridad
+5. Si el User se creó desde el formulario de registro, el formulario completa los datos del Cliente (DNI real, teléfono, etc.)
 ```
 
 ### ¿Por qué es mejor que crear el Cliente en el formulario?
@@ -1131,75 +1241,38 @@ En `base.html`:
 
 ---
 
-## 11. Datos Mock (de mentira)
+## 11. Datos Reales (antes Mock)
 
-### ¿Qué son y por qué existen?
+### Consultas reales a la base de datos
 
-Como todavía no hemos implementado la lógica bancaria real (crear cuentas, hacer transferencias de verdad), usamos **datos inventados** para que el sistema se vea funcionando.
+En versiones anteriores se usaban datos mock (inventados) para simular el funcionamiento. A partir de la versión actual, **todas las vistas usan consultas reales a la base de datos**:
 
-Están definidos en `DashboardView.get_context_data()` y `TransferenciaView.get_context_data()`.
+- **Dashboard**: consulta el `Cliente`, sus `Cuentas`, `Transacciones` y `Prestamos` desde PostgreSQL
+- **Transferencia**: crea `Transaccion` reales, actualiza saldos con `select_for_update` y `transaction.atomic`
+- **Préstamos**: crea `Prestamo` y `CuotaPrestamo` en la DB, realiza pagos reales
 
-### Código actual (mock)
+El template sigue siendo compatible con ambas fuentes gracias a `@property nombre` en el modelo `Cliente`.
+
+### Cómo funciona ahora
 
 ```python
-class DashboardView(LoginRequiredMixin, TemplateView):
-    template_name = 'dashboard.html'
-
+class PanelView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-
-        # ── DATOS MOCK ──────────────────────────────
-        # TODO: Reemplazar con consultas reales a la DB
-        mock_cliente = {
-            'nombre': self.request.user.first_name or self.request.user.username,
-            'apellido': self.request.user.last_name,
-            'email': self.request.user.email,
-        }
-
-        mock_cuentas = [
-            {'tipo': 'Caja de Ahorro', 'numero': '**** 4521', 'saldo': 125430.50, 'moneda': 'ARS', 'estado': 'activa'},
-            {'tipo': 'Cuenta Corriente', 'numero': '**** 7890', 'saldo': 8750.00, 'moneda': 'USD', 'estado': 'activa'},
-        ]
-
-        mock_transacciones = [
-            {'fecha': '05/06/2026', 'tipo': 'Transferencia', 'descripcion': 'Transferencia a Juan Pérez', 'monto': -15000.00},
-            {'fecha': '04/06/2026', 'tipo': 'Depósito', 'descripcion': 'Depósito en efectivo', 'monto': 50000.00},
-            # ... más transacciones ...
-        ]
-        # ── FIN DATOS MOCK ──────────────────────────
-
-        context['cliente'] = mock_cliente
-        context['cuentas'] = mock_cuentas
-        context['transacciones'] = mock_transacciones
+        cliente = self.request.user.cliente
+        cuentas = cliente.cuentas.all()
+        transacciones = Transaccion.objects.filter(
+            Q(cuenta_origen__in=cuentas) | Q(cuenta_destino__in=cuentas)
+        ).order_by('-fecha_creacion')[:10]
+        prestamos = Prestamo.objects.filter(cliente=cliente)[:5]
+        context['cliente'] = cliente
+        context['cuentas'] = cuentas
+        context['transacciones'] = transacciones
+        context['prestamos'] = prestamos
         return context
 ```
 
-### Cómo se reemplazará después
-
-Cuando implementen la lógica real, esto se cambiará por:
-
-```python
-from django.shortcuts import get_object_or_404
-from .models import Cliente, Cuenta, Transaccion
-
-def get_context_data(self, **kwargs):
-    context = super().get_context_data(**kwargs)
-    
-    cliente = get_object_or_404(Cliente, usuario=self.request.user)
-    cuentas = Cuenta.objects.filter(cliente=cliente)
-    transacciones = Transaccion.objects.filter(
-        cuenta_origen__in=cuentas
-    ) | Transaccion.objects.filter(
-        cuenta_destino__in=cuentas
-    )
-    
-    context['cliente'] = cliente               # ← se pasa el modelo directamente
-    context['cuentas'] = cuentas
-    context['transacciones'] = transacciones.order_by('-fecha_creacion')[:10]
-    return context
-```
-
-**¿Por qué funciona `{{ cliente.nombre }}` en el template con un modelo real?** Porque agregamos la **propiedad** `nombre` en el modelo `Cliente`:
+### ¿Por qué funciona `{{ cliente.nombre }}` en el template? Porque agregamos la **propiedad** `nombre` en el modelo `Cliente`:
 
 ```python
 @property
@@ -1207,9 +1280,9 @@ def nombre(self):
     return self.usuario.first_name or self.usuario.username
 ```
 
-Esto permite que `cliente.nombre` funcione tanto con el diccionario mock actual como con una instancia real de `Cliente` cuando se migre a datos reales. El template no necesita cambios.
+Esto permite que `cliente.nombre` funcione directamente desde la instancia real del modelo `Cliente` sin necesidad de datos mock.
 
-**Diferencia clave:** Hoy los datos están escritos a mano en el código. Cuando sea funcional, los datos vendrán de la base de datos real.
+**Diferencia clave:** Los datos ya se obtienen de la base de datos real mediante consultas ORM y casos de uso hexagonales. La lógica de negocio (transferencias, préstamos) está en `domain/rules.py` y `application/use_cases.py`, separada de Django.
 
 ---
 
@@ -1248,28 +1321,29 @@ La arquitectura hexagonal funciona igual:
    └──────────────┘         └──────────────┘
 ```
 
-**En nuestro proyecto:**
+**En nuestro proyecto (implementado):**
 
 | Capa | ¿Qué va acá? | ¿Depende de Django? |
 |---|---|---|
-| **Domain** (dominio) | Entidades de negocio: `CuentaEntity`, `TransaccionEntity` | ❌ No |
-| **Domain/ports** | Interfaces: `class RepositorioCuenta(ABC)` | ❌ No |
-| **Domain/reglas** | Reglas de negocio: `validar_saldo_suficiente()` | ❌ No |
-| **Application** | Casos de uso: `RealizarTransferencia.ejecutar()` | ❌ No |
-| **Infrastructure/adapters** | Implementaciones concretas: `RepositorioCuentaORM` | ✅ Sí (usa Django ORM) |
+| **Domain** (dominio) | Entidades: `CuentaEntity`, `TransaccionEntity`, `PrestamoEntity` | ❌ No |
+| **Domain/ports** | Interfaces: `RepositorioCuenta(ABC)`, `RepositorioTransaccion(ABC)` | ❌ No |
+| **Domain/reglas** | Funciones: `validar_saldo_suficiente()`, `simular_cuotas_frances()` | ❌ No |
+| **Application** | Casos de uso: `RealizarTransferencia.ejecutar()`, `SolicitarPrestamo.ejecutar()` | ❌ No |
+| **Infrastructure/adapters** | `DjangoCuentaRepository`, `DjangoTransaccionRepository` | ✅ Sí (usa Django ORM) |
 | **Infrastructure/views** | Vistas que conectan el navegador con los casos de uso | ✅ Sí |
 
 **Ventaja:** Si mañana cambiamos de PostgreSQL a MySQL, solo tocamos el adaptador. La lógica de negocio (domain + application) no se modifica. Ni siquiera sabe qué base de datos se usa.
 
-### 12.2 ¿Por qué no hicimos hexagonal puro?
+### 12.2 ¿Por qué híbrido y no hexagonal puro?
 
-Cuando arrancamos el proyecto, nos dimos cuenta de que Django ya resuelve muchos problemas de forma excelente. Decidimos ser **pragmáticos**: usar Django donde ya es fuerte, y preparar hexagonal donde la lógica de negocio lo requiere.
+Decidimos ser **pragmáticos**: usar Django donde ya es fuerte, e implementar hexagonal donde la lógica de negocio lo requiere.
 
 | Módulo | Arquitectura | ¿Por qué esta decisión? |
 |---|---|---|
-| **Registro / Login** | MTV clásico de Django | Django tiene años de auditoría de seguridad en autenticación: hasheo de contraseñas con PBKDF2, protección contra timing attacks, CSRF, sesiones seguras. Reescribir todo eso para "ser hexagonal" sería inseguro y una pérdida de tiempo. |
-| **Dashboard** | MTV clásico | Es solo mostrar información. No hay lógica de negocio compleja que aislar. |
-| **Transferencias** (futuro) | **Hexagonal** | La lógica de transferencias involucra concurrencia (`select_for_update`), reglas de negocio (límite diario, saldo suficiente), y necesita ser testeable sin base de datos. |
+| **Registro / Login** | MTV clásico de Django | Django tiene años de auditoría de seguridad en autenticación: hasheo de contraseñas con PBKDF2, protección contra timing attacks, CSRF, sesiones seguras. |
+| **Dashboard** | MTV clásico | Es solo mostrar información. Se consulta el ORM directamente para lectura. |
+| **Transferencias** | **Hexagonal** | La lógica está en `RealizarTransferencia` (application) y usa puertos (`RepositorioCuenta`) implementados con `select_for_update`. La lógica de negocio está separada de Django. |
+| **Préstamos** | **Hexagonal** | `SolicitarPrestamo` y `PagarCuota` usan `RepositorioPrestamo` vía adaptadores. `simular_cuotas_frances()` y `simular_cuotas_aleman()` son funciones puras en `domain/rules.py` sin dependencias. |
 | **Detección de fraude** (futuro) | **Hexagonal** | Poder cambiar entre Scikit-learn y PyTorch sin tocar la lógica de negocio. |
 
 ### 12.3 ¿Qué ventajas nos da cada cosa de Django?
@@ -1277,22 +1351,23 @@ Cuando arrancamos el proyecto, nos dimos cuenta de que Django ya resuelve muchos
 | Feature de Django | Si lo hiciéramos con un adaptador propio... | Ventaja de usar Django |
 |---|---|---|
 | **`UserCreationForm`** | Tendríamos que validar contraseñas, hashear con PBKDF2, verificar que no sea una contraseña común, proteger contra timing attacks | Django ya lo hace, auditado por miles de desarrolladores |
-| **`LoginView`** | Manejar sesiones, cookies, expiración, redirección post-login | Django gestiona sesiones seguras con cookies firmadas |
+| **`InicioSesionView`** | Manejar sesiones, cookies, expiración, redirección post-login | Django gestiona sesiones seguras con cookies firmadas |
 | **`@login_required`** | Verificar en cada request si el usuario tiene sesión activa | Una línea de código protege toda una vista |
 | **CSRF token** | Generar token único, verificar en cada POST, rotar tokens | Django lo hace automáticamente con `{% csrf_token %}` |
 | **ORM** | Escribir SQL a mano, escapando inputs para evitar SQL injection | El ORM genera SQL parametrizado, immune a SQL injection |
 | **`messages`** | Guardar notificaciones en sesión, mostrarlas una vez y borrarlas | Django maneja el ciclo de vida completo |
 | **`transaction.atomic()`** | Manejar manualmente BEGIN/COMMIT/ROLLBACK | Garantiza atomicidad: si algo falla, todo se revierte |
 
-### 12.4 ¿Dónde va a estar el hexagonal entonces?
+### 12.4 Así funciona hoy el hexagonal
 
-En las carpetas `domain/`, `application/` y `infrastructure/adapters/`. Cuando implementemos las transferencias reales, el flujo será:
+El flujo de una transferencia sigue este camino:
 
 ```
                     ┌───────────────────────────────────────┐
                     │           Vista Django                 │
                     │  TransferenciaView (POST)              │
                     │  Recibe los datos del formulario       │
+                    │  Envuelve en transaction.atomic()      │
                     └──────────────┬────────────────────────┘
                                    │
                                    ▼
@@ -1315,9 +1390,9 @@ En las carpetas `domain/`, `application/` y `infrastructure/adapters/`. Cuando i
                    │                                     │
                    ▼                                     ▼
         ┌──────────────────────┐              ┌──────────────────────┐
-        │  Adaptador ORM      │              │  Adaptador ORM       │
-        │  (Django models)    │              │  (Django models)     │
-        │                      │              │                      │
+        │  Adaptador Django    │              │  Adaptador Django    │
+        │  DjangoCuentaRepo    │              │  DjangoTxRepo        │
+        │                       │              │                      │
         │  Cuenta.objects      │              │  Transaccion.objects │
         │  .select_for_update()│              │  .create()           │
         └──────────────────────┘              └──────────────────────┘
@@ -1330,14 +1405,153 @@ En las carpetas `domain/`, `application/` y `infrastructure/adapters/`. Cuando i
 
 **Beneficio académico de esta arquitectura:**
 
-1. Las **reglas de negocio** (`domain/reglas/`) se prueban sin base de datos — son funciones puras
-2. Los **casos de uso** (`application/`) se prueban con mocks — no necesitan Django
-3. Los **adaptadores** (`infrastructure/adapters/`) son delgados — solo conectan el ORM con los puertos
+1. Las **reglas de negocio** (`domain/rules.py`) se prueban sin base de datos — son funciones puras
+2. Los **casos de uso** (`application/use_cases.py`) se prueban con mocks — no necesitan Django
+3. Los **adaptadores** (`infrastructure/adapters/repositories.py`) son delgados — solo conectan el ORM con los puertos
 4. Si cambiamos de base de datos o de framework web, la lógica de negocio no se toca
+
+### 12.5 Estructura real de los archivos hexagonales
+
+#### `domain/entities.py` — Dataclases puras (sin Django)
+
+```python
+from dataclasses import dataclass
+from decimal import Decimal
+
+@dataclass
+class CuentaEntity:
+    id: int
+    cliente_id: int
+    tipo_cuenta: str
+    numero_cuenta: str
+    alias: Optional[str]
+    cvu: Optional[str]
+    saldo: Decimal = Decimal('0.00')
+    moneda: str = 'ARS'
+    estado: str = 'activa'
+
+@dataclass
+class PrestamoEntity:
+    id: int
+    cliente_id: int
+    monto_original: Decimal
+    saldo_pendiente: Decimal
+    tasa_interes_anual: float
+    plazo_meses: int
+    sistema_amortizacion: str = 'frances'
+    cuotas: List[CuotaEntity] = field(default_factory=list)
+```
+
+Son clases Python normales. No heredan de `models.Model`. No tocan la base de datos.
+
+#### `domain/ports.py` — Interfaces (ABCs)
+
+```python
+from abc import ABC, abstractmethod
+
+class RepositorioCuenta(ABC):
+    @abstractmethod
+    def buscar_por_id_con_bloqueo(self, cuenta_id: int) -> CuentaEntity: ...
+    
+    @abstractmethod
+    def buscar_por_alias_o_cvu(self, valor: str) -> Optional[CuentaEntity]: ...
+    
+    @abstractmethod
+    def incrementar_saldo(self, cuenta_id: int, delta: Decimal) -> None: ...
+```
+
+Define **qué operaciones** existen, sin decir **cómo** se implementan. Es un contrato.
+
+#### `domain/rules.py` — Lógica de negocio pura
+
+```python
+def simular_cuotas_frances(monto: Decimal, tasa_anual: float, plazo_meses: int):
+    """Calcula cuotas con sistema francés (cuota fija)."""
+    tasa_mensual = Decimal(str(tasa_anual / 12))
+    cuota_fija = monto * tasa_mensual * (1 + tasa_mensual) ** plazo / (...)
+    for i in range(1, plazo_meses + 1):
+        interes = saldo * tasa_mensual
+        amortizacion = cuota_fija - interes
+        saldo -= amortizacion
+        yield CuotaSimulada(numero=i, monto=cuota_fija, interes=interes, ...)
+```
+
+No usa Django, no usa base de datos. Es una función pura: dado un input, devuelve un output.
+
+#### `application/use_cases.py` — Orquestadores
+
+```python
+class RealizarTransferencia:
+    def __init__(self, repo_cuenta: RepositorioCuenta, repo_tx: RepositorioTransaccion):
+        self._repo_cuenta = repo_cuenta  # Puerto (no sabe cómo se implementa)
+        self._repo_tx = repo_tx
+    
+    def ejecutar(self, origen_id, destino_busqueda, monto, descripcion):
+        # 1. Validar reglas (domain/rules.py)
+        # 2. Buscar cuentas (a través del puerto)
+        # 3. Actualizar saldos
+        # 4. Registrar transacción
+        return ResultadoTransferencia(exitoso=True, mensaje='...')
+```
+
+El caso de uso **no sabe si los datos vienen de PostgreSQL o de un mock**. Solo conoce la interfaz (`RepositorioCuenta`).
+
+#### `infrastructure/adapters/repositories.py` — Implementaciones Django
+
+```python
+class DjangoCuentaRepository(RepositorioCuenta):
+    def buscar_por_id_con_bloqueo(self, cuenta_id: int):
+        c = Cuenta.objects.select_for_update().get(id=cuenta_id)
+        return _cuenta_a_entity(c)  # Convierte modelo Django → dataclass
+    
+    def incrementar_saldo(self, cuenta_id: int, delta: Decimal):
+        Cuenta.objects.filter(id=cuenta_id).update(saldo=F('saldo') + delta)
+```
+
+Acá sí se usa Django ORM. Pero solo en esta capa. El dominio no sabe que Django existe.
 
 ---
 
-## 13. Glosario Django
+## 13. Cómo ejecutar el sistema
+
+### Requisitos
+
+- **Python** 3.10+
+- **PostgreSQL** (local o Neon)
+- `.env` configurado
+
+### Pasos
+
+```bash
+# 1. Activar entorno virtual
+& ".venv\Scripts\Activate.ps1"   # Windows PowerShell
+source .venv/bin/activate         # Linux/Mac
+
+# 2. Instalar dependencias
+pip install -r requirements.txt
+
+# 3. Migrar base de datos
+python manage.py migrate
+
+# 4. Iniciar servidor
+python manage.py runserver
+
+# 5. Abrir en navegador
+# http://localhost:8000
+```
+
+### Flujo de prueba
+
+1. Entrá a `http://localhost:8000/registro/` — creá un usuario
+2. Te redirige al panel con tu cuenta de ahorro en pesos
+3. Registrá un segundo usuario desde otra pestaña/incógnito
+4. Volvé al primero, entrá a `/transferencia/` — transferí al número/alias/CVU del segundo
+5. Entrá a `/prestamos/solicitar/` — simulá un préstamo (francés o alemán), confirmalo
+6. En `/prestamos/` y luego `/prestamos/<id>/` pagá cuotas individuales
+
+---
+
+## 14. Glosario Django
 
 | Término | Significado (simple) |
 |---|---|

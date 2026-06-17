@@ -19,14 +19,20 @@
     <div class="account-grid">
       {% for c in cuentas %}
         <div class="account-card">
-          <div class="account-type">{{ c.tipo }}</div>
-          <div class="account-number">{{ c.numero }}</div>
+          <div class="account-type">{{ c.get_tipo_cuenta_display }}</div>
+          <div class="account-number">{{ c.numero_cuenta }}</div>
+          {% if c.alias %}
+            <div style="font-size: 0.75rem; color: #718096; margin-top: 0.125rem;">Alias: {{ c.alias }}</div>
+          {% endif %}
+          {% if c.cvu %}
+            <div style="font-size: 0.6875rem; color: #a0aec0; word-break: break-all;">CVU: {{ c.cvu }}</div>
+          {% endif %}
           <div class="account-balance">
             {% if c.moneda == 'USD' %}USD{% else %}${% endif %}
             {{ c.saldo|floatformat:2|intcomma }}
           </div>
           <div class="account-details">
-            <span class="status-badge {{ c.estado }}">{{ c.estado|title }}</span>
+            <span class="status-badge {{ c.estado }}">{{ c.get_estado_display }}</span>
           </div>
         </div>
       {% endfor %}
@@ -53,11 +59,11 @@
         <tbody>
           {% for t in transacciones %}
             <tr>
-              <td>{{ t.fecha }}</td>
-              <td>{{ t.tipo }}</td>
+              <td>{{ t.fecha_creacion|date:"d/m/Y" }}</td>
+              <td>{{ t.get_tipo_display }}</td>
               <td>{{ t.descripcion }}</td>
-              <td class="amount {% if t.monto > 0 %}amount-positive{% else %}amount-negative{% endif %}">
-                {% if t.monto > 0 %}+{% endif %}${{ t.monto|floatformat:2|intcomma }}
+              <td class="amount {% if t.cuenta_origen_id in cuentas_ids %}amount-negative{% else %}amount-positive{% endif %}">
+                {% if t.cuenta_origen_id not in cuentas_ids %}+{% endif %}${{ t.monto|floatformat:2|intcomma }}
               </td>
             </tr>
           {% endfor %}
@@ -67,6 +73,31 @@
   {% else %}
     <div class="dashboard-empty">
       <p>No hay movimientos registrados.</p>
+    </div>
+  {% endif %}
+
+  <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem; margin-top: 0.5rem;">
+    <h3 class="section-title" style="margin-bottom: 0;">Tus Préstamos</h3>
+    <a href="{% url 'prestamos' %}" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.8125rem;">Ver todos</a>
+  </div>
+
+  {% if prestamos %}
+    <div class="account-grid">
+      {% for p in prestamos %}
+        <a href="{% url 'prestamo_detalle' p.id %}" style="text-decoration: none;">
+          <div class="account-card" style="border-left-color: #2b6cb0;">
+            <div style="font-size: 0.8125rem; font-weight: 600; color: #1a202c; margin-bottom: 0.25rem;">Préstamo #{{ p.id }} — {{ p.get_sistema_amortizacion_display }}</div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: #1a202c;">${{ p.monto_original|floatformat:2|intcomma }}</div>
+            <div style="font-size: 0.75rem; color: #718096; margin-top: 0.25rem;">Pendiente: ${{ p.saldo_pendiente|floatformat:2|intcomma }}</div>
+            <span class="status-badge {{ p.estado }}" style="margin-top: 0.5rem;">{{ p.get_estado_display }}</span>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div style="text-align: center; padding: 1.5rem; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0;">
+      <p style="font-size: 0.875rem; color: #718096;">No tenés préstamos activos.</p>
+      <a href="{% url 'prestamos_solicitar' %}" class="btn btn-primary" style="margin-top: 0.5rem; padding: 0.375rem 0.75rem; font-size: 0.8125rem;">Solicitar uno</a>
     </div>
   {% endif %}
 </div>

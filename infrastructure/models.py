@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
@@ -71,8 +72,11 @@ class Cuenta(models.Model):
 
     cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name='cuentas')
     tipo_cuenta = models.CharField(max_length=20, choices=TIPO_CUENTA)
+    numero_cuenta = models.CharField(max_length=20, unique=True, null=True, blank=True, editable=False)
+    alias = models.CharField(max_length=20, unique=True, null=True, blank=True)
+    cvu = models.CharField(max_length=22, unique=True, null=True, blank=True)
     saldo = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    moneda = models.CharField(max_length=3, default='USD')
+    moneda = models.CharField(max_length=3, default='ARS')
     fecha_apertura = models.DateTimeField(auto_now_add=True)
     estado = models.CharField(max_length=20, choices=ESTADO_CUENTA, default='activa')
     limite_transferencia_diario = models.DecimalField(max_digits=12, decimal_places=2, default=1000.00)
@@ -80,8 +84,13 @@ class Cuenta(models.Model):
     class Meta:
         ordering = ['-fecha_apertura']
 
+    def save(self, *args, **kwargs):
+        if not self.numero_cuenta:
+            self.numero_cuenta = uuid.uuid4().hex[:12].upper()
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"Cuenta {self.id} - {self.cliente.usuario.username}"
+        return f"Cuenta {self.numero_cuenta} - {self.cliente.usuario.username}"
 
 class Tarjeta(models.Model):
     TIPO_TARJETA = [
@@ -117,12 +126,14 @@ class Tarjeta(models.Model):
 
 class Prestamo(models.Model):
     ESTADO_PRESTAMO = [('activo', 'Activo'), ('pagado', 'Pagado'), ('vencido', 'Vencida/Mora')]
+    SISTEMA_AMORTIZACION = [('frances', 'Francés'), ('aleman', 'Alemán')]
 
     cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name='prestamos')
     monto_original = models.DecimalField(max_digits=12, decimal_places=2)
     saldo_pendiente = models.DecimalField(max_digits=12, decimal_places=2)
     tasa_interes_anual = models.FloatField()
     plazo_meses = models.IntegerField()
+    sistema_amortizacion = models.CharField(max_length=20, choices=SISTEMA_AMORTIZACION, default='frances')
     fecha_inicio = models.DateTimeField(auto_now_add=True)
     estado = models.CharField(max_length=20, choices=ESTADO_PRESTAMO, default='activo')
 
@@ -150,6 +161,8 @@ class CuotaPrestamo(models.Model):
     numero_cuota = models.IntegerField()
     monto_cuota = models.DecimalField(max_digits=12, decimal_places=2)
     fecha_vencimiento = models.DateField()
+    fecha_pago = models.DateField(null=True, blank=True)
+    monto_pagado = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     estado = models.CharField(max_length=20, choices=ESTADO_CUOTA, default='pendiente')
 
     class Meta:

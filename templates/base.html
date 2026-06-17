@@ -11,23 +11,27 @@
   <link rel="stylesheet" href="{% static 'css/estilo.css' %}">
 </head>
 <body>
+  <a href="#main" class="skip-link">Saltar al contenido</a>
   <header class="header">
     <div class="header-inner">
       <a href="{% url 'inicio' %}" class="logo">Banco Hexagonal</a>
-      <nav class="nav">
+      <nav class="nav" aria-label="Navegación principal">
         <a href="{% url 'inicio' %}">Inicio</a>
         {% if user.is_authenticated %}
           <span class="nav-user">{{ user.username }}</span>
-          <a href="{% url 'logout' %}">Cerrar sesión</a>
+          <form method="post" action="{% url 'cerrar_sesion' %}" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" class="nav-logout">Cerrar sesión</button>
+          </form>
         {% else %}
-          <a href="{% url 'login' %}">Iniciar sesión</a>
+          <a href="{% url 'inicio_sesion' %}">Iniciar sesión</a>
           <a href="{% url 'registro' %}" class="nav-cta">Abrir cuenta</a>
         {% endif %}
       </nav>
     </div>
   </header>
 
-  <main class="main">
+  <main class="main" id="main" tabindex="-1">
     {% if messages %}
       <div class="messages">
         {% for message in messages %}
