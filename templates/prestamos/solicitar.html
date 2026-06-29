@@ -2,7 +2,7 @@
 {% load humanize %}
 {% block title %}Solicitar Préstamo - Banco Hexagonal{% endblock %}
 {% block content %}
-<div class="card card-wide">
+<div class="card card-wide" style="max-width: 690px; width: 100%; margin: 0 auto;">
   <div class="card-logo">
     <h1>Solicitar Préstamo</h1>
     <p>Completá los datos para simular tu préstamo</p>
@@ -45,8 +45,8 @@
     <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem;">Resultado de la simulación</h3>
     <p style="font-size: 0.8125rem; color: #718096; margin-bottom: 0.5rem;">Tasa anual: {{ tasa|floatformat:1 }}% &middot; {{ simulacion|length }} cuotas</p>
 
-    <div class="table-container" style="margin-bottom: 1rem;">
-      <table class="transactions-table">
+    <div class="table-container" style="margin-bottom: 1rem; width: 100%; overflow-x: auto; display: block; -webkit-overflow-scrolling: touch;">
+      <table class="transactions-table" style="width: 100%; min-width: 600px; border-collapse: collapse;">
         <thead>
           <tr>
             <th>Cuota</th>

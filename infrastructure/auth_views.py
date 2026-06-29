@@ -21,7 +21,9 @@ from infrastructure.adapters.repositories import (
     DjangoPrestamoRepository,
 )
 
-
+from django.contrib.auth.mixins import UserPassesTestMixin
+from django.views.generic import TemplateView
+from django.contrib.auth.mixins import LoginRequiredMixin
 class InicioView(TemplateView):
     template_name = 'inicio.html'
 
@@ -256,3 +258,10 @@ class PrestamoDetalleView(LoginRequiredMixin, DetailView):
             messages.error(request, 'Error al procesar el pago.')
 
         return redirect('prestamo_detalle', pk=self.kwargs['pk'])
+    
+
+class MetricasView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+    template_name = 'metricas.html'
+
+    def test_func(self):
+        return self.request.user.is_active and self.request.user.is_superuser

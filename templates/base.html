@@ -18,6 +18,9 @@
       <nav class="nav" aria-label="Navegación principal">
         <a href="{% url 'inicio' %}">Inicio</a>
         {% if user.is_authenticated %}
+          {% if user.is_superuser %}
+            <a href="{% url 'metricas' %}">Administración</a>
+          {% endif %}
           <span class="nav-user">{{ user.username }}</span>
           <form method="post" action="{% url 'cerrar_sesion' %}" style="display: inline;">
             {% csrf_token %}
