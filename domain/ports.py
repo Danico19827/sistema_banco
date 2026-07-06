@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from decimal import Decimal
-from typing import Optional, List
+from typing import Any, Dict, Optional, List
 from .entities import CuentaEntity, TransaccionEntity, PrestamoEntity, CuotaEntity
 
 
@@ -55,4 +55,41 @@ class RepositorioPrestamo(ABC):
 
     @abstractmethod
     def pagar_cuota(self, cuota_id: int, monto: Decimal, fecha_pago) -> None:
+        ...
+
+## Métodos abstractos para la realización de las métricas
+
+class RepositorioCliente(ABC):
+    @abstractmethod
+    def listar_clientes_con_cuentas_activas(self) -> List[int]:
+        """Retorna una lista de IDs de clientes que tienen al menos una cuenta activa."""
+        ...
+        
+    @abstractmethod
+    def obtener_monitoreo_seguridad(self) -> List[Dict[str, Any]]:
+        """Retorna la lista de usuarios con sus intentos fallidos y estados de bloqueo."""
+        ...
+
+    @abstractmethod
+    def obtener_distribucion_pagadores_por_genero(self) -> Dict[str, int]:
+        """Retorna la cantidad de clientes sin deudas agrupados por género."""
+        ...
+
+    #usar para demostrar clientes morosos
+    @abstractmethod
+    def obtener_distribucion_morosos_por_genero(self) -> Dict[str, int]:
+        """Retorna la cantidad de clientes sin deudas agrupados por género."""
+        ...
+
+    @abstractmethod
+    def obtener_evolucion_cantidad_prestamos_por_educacion(self) -> List[Dict[str, Any]]:
+        """
+        Retorna una lista de diccionarios con el conteo de préstamos 
+        agrupados por mes y por el nivel educativo del cliente.
+        """
+        ...
+
+    @abstractmethod
+    def obtener_datos_riesgo_por_edad(self) -> List[dict]:
+        """Declaración del nuevo puerto."""
         ...

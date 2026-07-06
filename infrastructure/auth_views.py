@@ -14,11 +14,12 @@ from django.views.generic import TemplateView, CreateView, DetailView, ListView
 from .forms import RegistroClienteForm
 from .models import Cuenta, Transaccion, Prestamo, CuotaPrestamo, ConfiguracionSeguridad
 
-from application.use_cases import RealizarTransferencia, SolicitarPrestamo, PagarCuota
+
+from application.use_cases import RealizarTransferencia, SolicitarPrestamo, PagarCuota, ObtenerTopIntentosFallidos, CalcularPromedioScoreClientesActivos, ObtenerDistribucionPagadoresPorGenero, ObtenerEvolucionCantidadPrestamosPorEducacion, ObtenerDatosRiesgoEdadUseCase
 from infrastructure.adapters.repositories import (
     DjangoCuentaRepository,
     DjangoTransaccionRepository,
-    DjangoPrestamoRepository,
+    DjangoPrestamoRepository, DjangoClienteRepository
 )
 
 from django.contrib.auth.mixins import UserPassesTestMixin
@@ -260,8 +261,103 @@ class PrestamoDetalleView(LoginRequiredMixin, DetailView):
         return redirect('prestamo_detalle', pk=self.kwargs['pk'])
     
 
-class MetricasView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
-    template_name = 'metricas.html'
+# Métodos para la administración de métricas y estádisticas del sistema
+class MetricasView(TemplateView):
+    template_name = 'metricas.html'  # Apunta al frontend/plantilla
 
+    # 0. Filtro de seguridad (Exclusivo superusuarios activos)
+    # Esto habilita el  template de métricas solamente para superusuarios
     def test_func(self):
         return self.request.user.is_active and self.request.user.is_superuser
+
+    def get_context_data(self, **kwargs):
+        # 1. Recuperamos el contexto base de la clase
+        contexto = super().get_context_data(**kwargs)
+        
+        # 2. Instanciamos la arquitectura limpia (lo que ya conocemos)
+        repo_cliente = DjangoClienteRepository()
+        repo_prestamo = DjangoPrestamoRepository()
+        caso_de_uso = CalcularPromedioScoreClientesActivos(repo_cliente, repo_prestamo)
+        
+        # 3. Calculamos el promedio
+        promedio = caso_de_uso.ejecutar()
+        
+        # 4. Inyectamos el valor en la "canasta" que va al HTML, en criollo: vuelca los datos en la plantilla html.
+        contexto['promedio_score'] = promedio
+
+
+        # ==========================================
+        # MÉTRICA B: SEGURIDAD DIL SISTEMA (Intentos fallidos de Login)
+        # ==========================================
+        caso_de_uso_seguridad = ObtenerTopIntentosFallidos(repo_cliente)
+        alertas_login = caso_de_uso_seguridad.ejecutar()
+        contexto['alertas_login'] = alertas_login  # Se va al MISMO HTML
+
+        # =========================================================
+        # MÉTRICA C: PAGADORES POR GÉNERO
+        # =========================================================
+        caso_genero = ObtenerDistribucionPagadoresPorGenero(repo_cliente)
+        
+        # 1. Guardamos el diccionario en 'distribucion'
+        distribucion = caso_genero.ejecutar() 
+        
+        # 2. Usamos 'distribucion' (y no distribucion_pagadores) para armar la lista
+        datos_grafico_genero = [
+            distribucion.get('Femenino', 0),
+            distribucion.get('Masculino', 0),
+            distribucion.get('No especifica', 0)
+        ]
+
+        contexto['datos_genero'] = datos_grafico_genero
+        
+        # =========================================================
+        # MÉTRICA D: EVOLUCIÓN TEMPORAL POR EDUCACIÓN
+        # =========================================================
+        caso_educacion = ObtenerEvolucionCantidadPrestamosPorEducacion(
+            repo_cliente=DjangoClienteRepository() 
+        )
+        evolucion_educacion = caso_educacion.ejecutar() 
+        
+        # Pasamos las nuevas llaves al contexto
+        contexto['cantidades_primario'] = evolucion_educacion.get('Primario', [0]*6)
+        contexto['cantidades_secundario'] = evolucion_educacion.get('Secundario', [0]*6)
+        contexto['cantidades_superior'] = evolucion_educacion.get('Terciario/Universitario', [0]*6)
+
+
+        # =========================================================
+        # MÉTRICA A: Gráfico de burbujas de riesgo por edad
+        # =========================================================
+        # Instanciamos el caso de uso del gráfico de burbujas
+        use_case_riesgo = ObtenerDatosRiesgoEdadUseCase(
+            repo_cliente=DjangoClienteRepository()
+        )
+
+        # Obtenemos los datos para las burbujas
+        datos_burbujas_crudos = use_case_riesgo.ejecutar()
+
+        datos_simulados = [
+        # Clientes jóvenes con mora o pagos al día
+        {'x': 23, 'y': 3, 'r': 150000.0, 'riesgo': 'En Mora'},
+        {'x': 28, 'y': 1, 'r': 85000.0, 'riesgo': 'Pagó a Tiempo'},
+        
+        # Clientes mediana edad con montos altos e historial variado
+        {'x': 32, 'y': 4, 'r': 650000.0, 'riesgo': 'En Mora'},
+        {'x': 42, 'y': 2, 'r': 320000.0, 'riesgo': 'En Mora'},
+        {'x': 47, 'y': 5, 'r': 1200000.0, 'riesgo': 'Pagó a Tiempo'}, # Una burbuja gigante verde
+        
+        # Adultos mayores con créditos recurrentes
+        {'x': 55, 'y': 3, 'r': 450000.0, 'riesgo': 'Pagó a Tiempo'},
+        {'x': 62, 'y': 4, 'r': 900000.0, 'riesgo': 'En Mora'}, # Una burbuja grande roja
+        {'x': 75, 'y': 2, 'r': 200000.0, 'riesgo': 'En Mora'},
+    ]
+
+        # Fusionamos los datos  de la BD con el set simulado
+        datos_finales_burbujas = datos_burbujas_crudos + datos_simulados
+
+        # Pasamos los datos crudos al contexto
+        contexto['datos_riesgo_burbujas'] = datos_finales_burbujas
+
+        return contexto
+        
+    
+

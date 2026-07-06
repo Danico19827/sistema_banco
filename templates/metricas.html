@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load humanize %}
+{% load humanize static %}
 
 {% block title %}Minería de Datos - Administración{% endblock %}
 
@@ -14,6 +14,13 @@
   </div>
 
   <div class="account-grid" style="grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+
+    {{ datos_riesgo_burbujas|json_script:"data-riesgo-burbujas" }}
+    {{ cantidades_primario|json_script:"data-primario" }}
+    {{ cantidades_secundario|json_script:"data-secundario" }}
+    {{ cantidades_superior|json_script:"data-superior" }}
+    {{ datos_genero|json_script:"data-genero" }}
+    {{ promedio_score|json_script:"data-promedio-score" }}
 
     <div class="account-card" style="height: auto; padding: 1.5rem; border-top: 4px solid #9f7aea; grid-column: 1 / -1;">
       <div class="account-type" style="margin-bottom: 1rem; font-size: 0.9rem; letter-spacing: 0.05em;">
@@ -52,12 +59,11 @@
         EVOLUCIÓN TEMPORAL
       </div>
       <div style="font-size: 1.1rem; font-weight: 700; color: #1a202c; margin-bottom: 0.25rem;">
-        Monto de Préstamos por Educación
+        Cantidad de Préstamos por Educación
       </div>
       <div style="font-size: 0.75rem; color: #718096; margin-bottom: 1.5rem;">
-        Crecimiento acumulado en volumen de crédito solicitado
+        Evolución acumulada de créditos otorgados según el nivel educativo máximo del cliente
       </div>
-      
       <div style="position: relative; height: 260px; width: 100%;">
         <canvas id="chartAreasEducacion"></canvas>
       </div>
@@ -76,9 +82,28 @@
       
       <div style="position: relative; height: 220px; width: 100%; display: flex; justify-content: center; align-items: center;">
         <canvas id="chartScoreCrediticio"></canvas>
-        <div style="position: absolute; bottom: 35px; text-align: center;">
-          <span style="font-size: 2rem; font-weight: 800; color: #2d3748;">720</span>
-          <p style="margin: 0; font-size: 0.8rem; color: #48bb78; font-weight: 600;">Score Bueno</p>
+        <div style="position: absolute; bottom: 35px; text-align: center; width: 100%;">
+          <span style="font-size: 2rem; font-weight: 800; color: #2d3748;">
+            {% if promedio_score %}
+              {{ promedio_score|floatformat:0 }}
+            {% else %}
+              -
+            {% endif %}
+          </span>
+          
+          <p style="margin: 0; font-size: 0.85rem; font-weight: 700;">
+            {% if not promedio_score %}
+              <span style="color: #718096;">Sin Datos</span>
+            {% elif promedio_score < 200 %}
+              <span style="color: #e53e3e;">Crítico</span>
+            {% elif promedio_score < 300 %}
+              <span style="color: #dd6b20;">Normal</span>
+            {% elif promedio_score < 400 %}
+              <span style="color: #3182ce;">Regular</span>
+            {% else %}
+              <span style="color: #48bb78;">Excelente</span>
+            {% endif %}
+          </p>
         </div>
       </div>
     </div>
@@ -104,38 +129,22 @@
             </tr>
           </thead>
           <tbody>
-            {% for usuario, intentos, estado in intentos_fallidos_detalle %}
+            {% for alerta in alertas_login %}
             <tr style="border-bottom: 1px solid #edf2f7;">
-              <td style="padding: 0.6rem 0.4rem; font-weight: 500; color: #2d3748;">{{ usuario }}</td>
-              <td style="padding: 0.6rem 0.4rem; text-align: center; color: #e53e3e; font-weight: 600;">{{ intentos }}</td>
+              <td style="padding: 0.6rem 0.4rem; font-weight: 500; color: #2d3748;">{{ alerta.usuario }}</td>
+              <td style="padding: 0.6rem 0.4rem; text-align: center; color: #e53e3e; font-weight: 600;">{{ alerta.intentos }}</td>
               <td style="padding: 0.6rem 0.4rem; text-align: right;">
-                {% if estado == 'Bloqueado' %}
-                <span style="background-color: #fed7d7; color: #9b2c2c; padding: 0.2rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">{{ estado }}</span>
+                {% if alerta.estado == 'Bloqueado' %}
+                <span style="background-color: #fed7d7; color: #9b2c2c; padding: 0.2rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">{{ alerta.estado }}</span>
                 {% else %}
-                <span style="background-color: #c6f6d5; color: #22543d; padding: 0.2rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">{{ estado }}</span>
+                <span style="background-color: #c6f6d5; color: #22543d; padding: 0.2rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">{{ alerta.estado }}</span>
                 {% endif %}
               </td>
             </tr>
             {% empty %}
             <tr style="border-bottom: 1px solid #edf2f7;">
-              <td style="padding: 0.6rem 0.4rem; font-weight: 500; color: #2d3748;">tommi123</td>
-              <td style="padding: 0.6rem 0.4rem; text-align: center; color: #e53e3e; font-weight: 600;">7</td>
-              <td style="padding: 0.6rem 0.4rem; text-align: right;">
-                <span style="background-color: #fed7d7; color: #9b2c2c; padding: 0.2rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Bloqueado</span>
-              </td>
-            </tr>
-            <tr style="border-bottom: 1px solid #edf2f7;">
-              <td style="padding: 0.6rem 0.4rem; font-weight: 500; color: #2d3748;">CocodriloCocodrilo</td>
-              <td style="padding: 0.6rem 0.4rem; text-align: center; color: #dd6b20; font-weight: 600;">2</td>
-              <td style="padding: 0.6rem 0.4rem; text-align: right;">
-                <span style="background-color: #feebcb; color: #9c4221; padding: 0.2rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Normal</span>
-              </td>
-            </tr>
-            <tr style="border-bottom: 1px solid #edf2f7;">
-              <td style="padding: 0.6rem 0.4rem; font-weight: 500; color: #2d3748;">admin_backoffice</td>
-              <td style="padding: 0.6rem 0.4rem; text-align: center; color: #e53e3e; font-weight: 600;">12</td>
-              <td style="padding: 0.6rem 0.4rem; text-align: right;">
-                <span style="background-color: #fed7d7; color: #9b2c2c; padding: 0.2rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Bloqueado</span>
+              <td colspan="3" style="padding: 1rem; text-align: center; color: #718096; font-style: italic;">
+                No se registran alertas de seguridad en el sistema.
               </td>
             </tr>
             {% endfor %}
@@ -153,165 +162,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 
-<script>
-  // ==========================================
-  // GRAFICO 2: TORTA (GÉNEROS QUE PAGAN A TIEMPO)
-  // ==========================================
-  const ctxTorta = document.getElementById('chartTortaGeneros').getContext('2d');
-  new Chart(ctxTorta, {
-    type: 'pie',
-    data: {
-      labels: ['Femenino', 'Masculino', 'No especifica'],
-      datasets: [{
-        data: [55, 40, 5],
-        backgroundColor: ['#319795', '#2b6cb0', '#a0aec0'],
-        borderWidth: 2,
-        borderColor: '#ffffff'
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { position: 'bottom', labels: { font: { family: 'sans-serif', size: 12 }, boxWidth: 15 } }
-      }
-    }
-  });
-
-  // ==========================================
-  // GRAFICO 3: ÁREAS APILADAS (NIVEL EDUCATIVO)
-  // ==========================================
-  const ctxAreas = document.getElementById('chartAreasEducacion').getContext('2d');
-  new Chart(ctxAreas, {
-    type: 'line',
-    data: {
-      labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],
-      datasets: [
-        {
-          label: 'Primario',
-          data: [100000, 150000, 220000, 250000, 290000, 320000],
-          backgroundColor: 'rgba(237, 137, 54, 0.6)',
-          borderColor: '#ed8936',
-          fill: true,
-          tension: 0.3
-        },
-        {
-          label: 'Secundario',
-          data: [200000, 280000, 390000, 410000, 490000, 550000],
-          backgroundColor: 'rgba(229, 62, 62, 0.6)',
-          borderColor: '#e53e3e',
-          fill: true,
-          tension: 0.3
-        },
-        {
-          label: 'Terciario',
-          data: [350000, 490000, 610000, 680000, 720000, 810000],
-          backgroundColor: 'rgba(66, 153, 225, 0.6)',
-          borderColor: '#4299e1',
-          fill: true,
-          tension: 0.3
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        x: { grid: { display: false } },
-        y: { stacked: true, grid: { color: '#f7fafc' } }
-      },
-      plugins: {
-        legend: { position: 'bottom', labels: { font: { family: 'sans-serif', size: 12 }, boxWidth: 15 } }
-      }
-    }
-  });
-
-  // ==========================================
-  // GRAFICO 4: SCORE CREDITICIO (MEDIDOR)
-  // ==========================================
-  const ctxScore = document.getElementById('chartScoreCrediticio').getContext('2d');
-  new Chart(ctxScore, {
-    type: 'doughnut',
-    data: {
-      datasets: [{
-        data: [720, 130],
-        backgroundColor: ['#48bb78', '#e2e8f0'],
-        borderWidth: 0
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      circumference: 180,
-      rotation: -90,
-      cutout: '80%',
-      plugins: { legend: { display: false } }
-    }
-  });
-
-  // ==========================================
-  // GRAFICO 1: BURBUJAS EFECTO PERSPECTIVA (3D VISUAL)
-  // ==========================================
-  const ctxBurbuja = document.getElementById('chartBurbujaEdad').getContext('2d');
-  new Chart(ctxBurbuja, {
-    type: 'bubble',
-    data: {
-      datasets: [
-        {
-          label: 'Pagó a Tiempo',
-          data: [
-            { x: 25, y: 2, r: 12 },
-            { x: 34, y: 5, r: 18 },
-            { x: 45, y: 3, r: 14 },
-            { x: 52, y: 7, r: 22 },
-            { x: 60, y: 1, r: 10 }
-          ],
-          // Sombra interna/Efecto 3D simulado con bordes gruesos e iluminación radial
-          backgroundColor: 'rgba(72, 187, 120, 0.7)',
-          borderColor: '#2f855a',
-          borderWidth: 2,
-          hoverBorderWidth: 4
-        },
-        {
-          label: 'En Mora / Atrasado',
-          data: [
-            { x: 22, y: 4, r: 15 },
-            { x: 29, y: 6, r: 20 },
-            { x: 41, y: 2, r: 11 },
-            { x: 58, y: 8, r: 25 }
-          ],
-          backgroundColor: 'rgba(229, 62, 62, 0.7)',
-          borderColor: '#9b2c2c',
-          borderWidth: 2,
-          hoverBorderWidth: 4
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        x: {
-          title: { display: true, text: 'Edad (Años)', font: { size: 12, weight: 'bold' } },
-          grid: { color: '#edf2f7' }
-        },
-        y: {
-          title: { display: true, text: 'Cant. Créditos Solicitados', font: { size: 12, weight: 'bold' } },
-          grid: { color: '#edf2f7' }
-        }
-      },
-      plugins: {
-        legend: { position: 'top', labels: { boxWidth: 15, font: { size: 12 } } },
-        tooltip: {
-          callbacks: {
-            label: function(context) {
-              return `${context.dataset.label} -> Edad: ${context.raw.x} años, Créditos: ${context.raw.y} unidades, Volumen: ${context.raw.r}`;
-            }
-          }
-        }
-      }
-    }
-  });
-</script>
+<script src="{% static 'js/charts_metricas.js' %}"></script>
 {% endblock %}

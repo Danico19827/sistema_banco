@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from domain.entities import CuentaEntity, TransaccionEntity, PrestamoEntity, CuotaEntity
-from domain.ports import RepositorioCuenta, RepositorioTransaccion, RepositorioPrestamo
+from domain.ports import RepositorioCuenta, RepositorioTransaccion, RepositorioPrestamo, RepositorioCliente
 from domain.rules import (
     validar_saldo_suficiente,
     validar_monto_positivo,
@@ -185,3 +185,63 @@ class PagarCuota:
         self._repo_prestamo.pagar_cuota(cuota_id, cuota.monto_cuota, date.today())
 
         return True, f'Cuota {cuota.numero_cuota} pagada con éxito.'
+
+# metricas
+
+class CalcularPromedioScoreClientesActivos:
+    def __init__(self, repo_cliente: RepositorioCliente, repo_prestamo: RepositorioPrestamo):
+        self._repo_cliente = repo_cliente
+        self._repo_prestamo = repo_prestamo
+
+    def ejecutar(self) -> Decimal:
+        # 1. Obtenemos los IDs de los clientes cuyo estado es 'activo'
+        clientes_ids = self._repo_cliente.listar_clientes_con_cuentas_activas()
+        
+        if not clientes_ids:
+            return Decimal('0.00')
+            
+        suma_scores = Decimal('0.00')
+        
+        # 2. Recorremos los clientes activos y sumamos su score inicial real
+        for cliente_id in clientes_ids:
+            score_cliente = self._repo_cliente.obtener_score_por_cliente(cliente_id)
+            suma_scores += Decimal(str(score_cliente))
+            
+        # 3. Calculamos el promedio
+        total_clientes = Decimal(len(clientes_ids))
+        promedio = suma_scores / total_clientes
+        
+        return promedio
+
+class ObtenerTopIntentosFallidos:
+    def __init__(self, repositorio_cliente):
+        self.repositorio_cliente = repositorio_cliente
+
+    def ejecutar(self):
+        return self.repositorio_cliente.obtener_monitoreo_seguridad()
+
+class ObtenerDistribucionPagadoresPorGenero:
+    def __init__(self, repositorio_cliente: RepositorioCliente):
+        self._repositorio_cliente = repositorio_cliente
+
+    def ejecutar(self) -> dict[str, int]:
+        """
+        Calcula la distribución por género de aquellos clientes 
+        que están al día con sus cuotas (sin cuotas vencidas).
+        """
+        return self._repositorio_cliente.obtener_distribucion_pagadores_por_genero()
+    
+class ObtenerEvolucionCantidadPrestamosPorEducacion:
+    def __init__(self, repo_cliente):
+        self._repo_cliente = repo_cliente
+
+    def ejecutar(self):
+        datos_crudos = self._repo_cliente.obtener_evolucion_cantidad_prestamos_por_educacion()
+        return datos_crudos
+    
+class ObtenerDatosRiesgoEdadUseCase:
+    def __init__(self, repo_cliente):
+        self._repo_cliente = repo_cliente
+
+    def ejecutar(self) -> List[dict]:
+        return self._repo_cliente.obtener_datos_riesgo_por_edad()
