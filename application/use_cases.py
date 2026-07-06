@@ -214,7 +214,7 @@ class CalcularPromedioScoreClientesActivos:
         return promedio
 
 class ObtenerTopIntentosFallidos:
-    def __init__(self, repositorio_cliente):
+    def __init__(self, repositorio_cliente: RepositorioCliente):
         self.repositorio_cliente = repositorio_cliente
 
     def ejecutar(self):
@@ -232,7 +232,7 @@ class ObtenerDistribucionPagadoresPorGenero:
         return self._repositorio_cliente.obtener_distribucion_pagadores_por_genero()
     
 class ObtenerEvolucionCantidadPrestamosPorEducacion:
-    def __init__(self, repo_cliente):
+    def __init__(self, repo_cliente: RepositorioCliente):
         self._repo_cliente = repo_cliente
 
     def ejecutar(self):
@@ -240,7 +240,7 @@ class ObtenerEvolucionCantidadPrestamosPorEducacion:
         return datos_crudos
     
 class ObtenerDatosRiesgoEdadUseCase:
-    def __init__(self, repo_cliente):
+    def __init__(self, repo_cliente: RepositorioCliente):
         self._repo_cliente = repo_cliente
 
     def ejecutar(self) -> List[dict]:

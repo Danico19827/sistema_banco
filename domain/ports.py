@@ -64,6 +64,11 @@ class RepositorioCliente(ABC):
     def listar_clientes_con_cuentas_activas(self) -> List[int]:
         """Retorna una lista de IDs de clientes que tienen al menos una cuenta activa."""
         ...
+    
+    @abstractmethod
+    def obtener_score_por_cliente(self, cliente_id: int) -> int:
+        """Obtiene el score crediticio inicial de un cliente."""
+        ...
         
     @abstractmethod
     def obtener_monitoreo_seguridad(self) -> List[Dict[str, Any]]:
