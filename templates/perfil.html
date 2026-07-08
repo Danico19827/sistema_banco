@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}Mi Perfil - Banco Hexagonal{% endblock %}
+{% block content %}
+<div class="card card-wide" style="max-width: 500px; width: 100%; margin: 0 auto;">
+  <div class="card-logo">
+    <h1>Mi Perfil</h1>
+    <p>Configuración de seguridad de tu cuenta</p>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="field-group" style="display: flex; align-items: center; gap: 1rem; padding: 1rem 0;">
+      <label for="doble_factor" style="font-weight: 600; flex: 1; cursor: pointer;">
+        Doble factor de autenticación (2FA)
+        <span style="display: block; font-size: 0.75rem; font-weight: 400; color: #718096;">
+          Si está activo, las transferencias mayores a $10.000 requerirán un código de verificación
+        </span>
+      </label>
+      <input type="checkbox" name="doble_factor" id="doble_factor"
+             style="width: 1.25rem; height: 1.25rem; cursor: pointer;"
+             {% if config.doble_factor_activo %}checked{% endif %}>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-full">Guardar cambios</button>
+  </form>
+
+  <div class="footer-text" style="margin-top: 1.5rem;">
+    <a href="{% url 'panel' %}">Volver al panel</a>
+  </div>
+</div>
+{% endblock %}
