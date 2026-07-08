@@ -53,10 +53,10 @@ TASA_PRESTAMO = 0.05
 
 stats = {
     'usuarios_creados': 0, 'depositos': 0,
-    'transfers_ok': 0, 'transfers_fail': 0,
-    'prestamos_ok': 0, 'prestamos_fail': 0,
+    'transfers_ok': 0, 'transfers_rechazadas': 0, 'transfers_errores': 0,
+    'prestamos_ok': 0, 'prestamos_rechazados': 0, 'prestamos_errores': 0,
     'cuotas_pagadas': 0, 'pf_creados': 0, 'pf_cancelados': 0,
-    'errores': 0,
+    'errores_otros': 0,
 }
 stats_lock = __import__('threading').Lock()
 usuarios_log = []
@@ -131,9 +131,9 @@ def transferir(origen_id, destino_busqueda, monto):
         if r.exitoso:
             inc('transfers_ok')
         else:
-            inc('transfers_fail')
+            inc('transfers_rechazadas')
     except Exception:
-        inc('transfers_fail')
+        inc('transfers_errores')
 
 
 def crear_prestamo(cliente_id, cuenta_id, monto, plazo, sistema):
@@ -149,10 +149,10 @@ def crear_prestamo(cliente_id, cuenta_id, monto, plazo, sistema):
             repo_c.incrementar_saldo(cuenta_id, Decimal(str(monto)))
             inc('prestamos_ok')
             return prestamo
-        inc('prestamos_fail')
+        inc('prestamos_rechazados')
         return None
     except Exception:
-        inc('prestamos_fail')
+        inc('prestamos_errores')
         return None
 
 
