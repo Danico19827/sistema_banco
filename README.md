@@ -13,7 +13,7 @@ Sistema bancario web con **detección de fraude** (Isolation Forest) y **scoring
 | RF-05 | Transferencia Bancaria | ✅ |
 | RF-06 | Historial de Movimientos | ✅ |
 | RF-07 | Detección de Fraude con ML | ✅ |
-| RF-08 | Autenticación 2FA | ❌ Pendiente |
+| RF-08 | Autenticación 2FA | ✅ |
 | RF-09 | Gestión de Alias y CVU | ✅ |
 | RF-10 | Solicitud de Préstamo | ✅ |
 | RF-11 | Simulación y Plan de Pagos | ✅ |
@@ -44,14 +44,16 @@ Sistema bancario web con **detección de fraude** (Isolation Forest) y **scoring
 |---|---|
 | **Python 3.13** | Lenguaje principal |
 | **Django 6.0** | Framework web (MTV para auth, hexagonal para lógica bancaria) |
-| **PostgreSQL** | Base de datos (local o Neon Serverless) |
+| **PostgreSQL** | Base de datos principal |
+| **SQLite** | Alternativa local (sin instalación, comentado en settings) |
+| **scikit-learn** | Isolation Forest (fraude) + Random Forest (scoring crediticio) |
+| **Chart.js** | Gráficos del panel de métricas |
 | **HTML5 + CSS3** | Frontend vanilla, sin frameworks externos |
-| **docx (Node.js)** | Generación de informe IEEE 830 en formato Word |
 
 ## Requisitos
 
 - Python 3.10+
-- PostgreSQL
+- PostgreSQL 16+ (o SQLite como alternativa local)
 
 ## Instalación
 
@@ -89,7 +91,7 @@ Abrí `http://localhost:8000` en el navegador.
 SECRET_KEY=clave-secreta-de-django
 DEBUG=True
 DB_NAME=bancadb
-DB_USER=usuario
+DB_USER=postgres
 DB_PASSWORD=contraseña
 DB_HOST=localhost
 DB_PORT=5432
@@ -99,6 +101,8 @@ Para generar `SECRET_KEY`:
 ```bash
 python manage.py shell -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 ```
+
+Para cambiar a SQLite (sin instalación), comentar la configuración de PostgreSQL y descomentar la de SQLite en `config/settings.py`.
 
 ## Rutas del sistema
 
@@ -172,12 +176,10 @@ Banco/
 │       ├── plazofijo_calc.js#   Cálculo en vivo de plazos fijos
 │       └── charts_metricas.js #   Gráficos Chart.js para métricas
 ├── scripts/                 # Scripts auxiliares
-│   ├── generar_datos.py          #  100 usuarios de prueba
-│   ├── generar_masivo.py         #  500 usuarios + 6000+ transferencias concurrentes
-│   ├── entrenar_fraude.py        #  Entrenamiento Isolation Forest (RF-07)
-│   ├── entrenar_scoring.py       #  Entrenamiento Random Forest (RF-15)
-│   ├── registro_masivo_concurrente.py
-│   └── simular_transacciones.py
+│   ├── generar_operaciones.py     #  Crear usuarios + operaciones (usa casos de uso reales)
+│   ├── demo_concurrencia.py       #  Demo de concurrencia con RealizarTransferencia
+│   ├── entrenar_fraude.py         #  Entrenamiento Isolation Forest (RF-07)
+│   └── entrenar_scoring.py        #  Entrenamiento Random Forest (RF-15)
 ├── documentation/
 │   ├── DOCUMENTACION.md    # Documentación didáctica detallada
 │   └── IEEE830_v2.pdf      # Especificación IEEE 830

@@ -1873,19 +1873,29 @@ python C:\ruta\al\proyecto\manage.py pagar_cuotas_vencidas
 
 ---
 
-## 20. Scripts de generación de datos
+## 20. Scripts
 
-El sistema incluye varios scripts para poblar la base de datos con datos de prueba:
+Todos los scripts usan **componentes reales del sistema** (casos de uso, repositorios, señales, ORM). Ninguno bypassea la lógica de negocio.
 
 | Script | Propósito | Cómo ejecutar |
 |---|---|---|
-| `scripts/generar_datos.py` | Crea 100 usuarios completos con cuentas, alias, CVU, préstamos y transacciones | `python scripts/generar_datos.py` |
-| `scripts/generar_masivo.py` | Crea 500 usuarios + ~6.000 transferencias + préstamos + plazos fijos usando ThreadPoolExecutor | `python scripts/generar_masivo.py` |
-| `scripts/registro_masivo_concurrente.py` | Registra 20 usuarios vía HTTP concurrente para probar el endpoint | `python scripts/registro_masivo_concurrente.py` |
-| `scripts/entrenar_fraude.py` | Entrena el modelo Isolation Forest para detección de fraude | `python scripts/entrenar_fraude.py` |
-| `scripts/entrenar_scoring.py` | Entrena el modelo Random Forest para scoring crediticio | `python scripts/entrenar_scoring.py` |
+| `scripts/generar_operaciones.py` | Crea usuarios + operaciones (transferencias, préstamos, plazos fijos) usando `RealizarTransferencia`, `SolicitarPrestamo`, `ConstituirPlazoFijo`, etc. Flags: `--crear=N`, `--entre-si`, `--operaciones` | `python scripts/generar_operaciones.py --crear=50 --operaciones --workers=20` |
+| `scripts/demo_concurrencia.py` | 10 threads concurrentes usando `RealizarTransferencia` + `select_for_update()` real de PostgreSQL. Demuestra integridad ACID | `python scripts/demo_concurrencia.py` |
+| `scripts/entrenar_fraude.py` | Entrena Isolation Forest con transacciones reales. Genera `modelo_fraude.pkl` | `python scripts/entrenar_fraude.py` |
+| `scripts/entrenar_scoring.py` | Entrena Random Forest con datos de clientes. Genera `modelo_scoring.pkl` | `python scripts/entrenar_scoring.py` |
 
-Los scripts `generar_datos.py` y `generar_masivo.py` dejan un archivo `.txt` con los usuarios creados y sus credenciales para facilitar el acceso.
+### Flags de `generar_operaciones.py`
+
+| Flag | Efecto |
+|---|---|
+| `--crear=50` | Crea 50 usuarios nuevos (usa `User.objects.create_user()` + señal `post_save`) |
+| `--entre-si` | Las operaciones solo involucran a los usuarios recién creados (requiere `--crear`) |
+| `--operaciones` | Ejecuta transferencias, préstamos y plazos fijos sobre los usuarios (nuevos, existentes o todos según flags) |
+| `--workers=20` | Cantidad de threads concurrentes |
+| `--prestamos=0.3` | Probabilidad de que un usuario pida préstamo |
+| `--plazos-fijos=0.2` | Probabilidad de que un usuario cree un plazo fijo |
+
+Todos los scripts dejan un log en `scripts/usuarios_generados_masivo.txt` (se agrega al final sin sobrescribir ejecuciones anteriores).
 
 ---
 
