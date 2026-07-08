@@ -243,26 +243,38 @@ def worker_operaciones(cliente_id, cuenta_id, alias_destinos, prestamo_prob, pf_
 
 def main():
     parser = argparse.ArgumentParser(description='Generar usuarios y operaciones')
-    parser.add_argument('--crear', type=int, default=0, help='Usuarios nuevos a crear')
+    parser.add_argument('--crear', type=int, default=0, help='Crear N usuarios nuevos')
+    parser.add_argument('--entre-si', action='store_true',
+                        help='Operaciones solo entre los nuevos (requiere --crear)')
+    parser.add_argument('--operaciones', action='store_true',
+                        help='Ejecutar operaciones sobre usuarios existentes')
     parser.add_argument('--password', type=str, default='BancoHexagonal2026!')
     parser.add_argument('--workers', type=int, default=20)
     parser.add_argument('--prestamos', type=float, default=0.3, help='Probabilidad de prestamo')
     parser.add_argument('--plazos-fijos', type=float, default=0.2, help='Probabilidad de plazo fijo')
     args = parser.parse_args()
 
+    if not args.crear and not args.operaciones:
+        parser.print_help()
+        print('\nError: Debes usar al menos --crear=N o --operaciones (o ambos).')
+        sys.exit(1)
+
     workers = args.workers
     inicio = time.time()
 
     print('=' * 55)
-    print('  GENERACION DE OPERACIONES')
+    print('  GENERACION DE DATOS')
     print(f'  Workers: {workers}')
     if args.crear:
         print(f'  Crear usuarios: {args.crear}')
-    print(f'  Prob. prestamo: {args.prestamos}')
-    print(f'  Prob. plazo fijo: {args.plazos_fijos}')
+    if args.operaciones:
+        print(f'  Operaciones: SI')
+        print(f'  Entre los nuevos: {"SI" if args.entre_si else "NO (todos)"}')
+        print(f'  Prob. prestamo: {args.prestamos}')
+        print(f'  Prob. plazo fijo: {args.plazos_fijos}')
     print('=' * 55)
 
-    # FASE 1: Crear usuarios
+    # Crear usuarios
     if args.crear:
         print(f'\nCreando {args.crear} usuarios...')
         t0 = time.time()
@@ -274,66 +286,82 @@ def main():
                 f.result()
         print(f'  Creados: {stats["usuarios_creados"]} en {time.time()-t0:.1f}s')
 
-    # FASE 2: Depositar saldo
-    print(f'\nDepositando saldo a cuentas en $0...')
-    t0 = time.time()
-    dep = depositar_saldo()
-    print(f'  Depositados: {dep} en {time.time()-t0:.1f}s')
+    # Operaciones
+    if args.operaciones:
+        # Determinar sobre que cuentas operar
+        if args.crear and args.entre_si:
+            usernames = [u['username'] for u in usuarios_log]
+            qs = Cuenta.objects.filter(
+                cliente__usuario__username__in=usernames,
+                estado='activa',
+            )
+        else:
+            qs = Cuenta.objects.filter(estado='activa')
 
-    # FASE 3: Generar operaciones
-    print(f'\nGenerando operaciones...')
-    t0 = time.time()
+        cuentas_con_saldo = list(qs.filter(saldo__gte=1000).select_related('cliente__usuario'))
+        cuentas_sin_saldo = list(qs.filter(saldo=0))
 
-    cuentas = list(Cuenta.objects.filter(estado='activa', saldo__gte=1000)
-                   .select_related('cliente__usuario'))
-    if not cuentas:
-        print('  No hay cuentas con saldo suficiente.')
-        return
+        if cuentas_sin_saldo:
+            print(f'\nDepositando saldo a {len(cuentas_sin_saldo)} cuentas en $0...')
+            t0 = time.time()
+            for c in cuentas_sin_saldo:
+                Cuenta.objects.filter(id=c.id).update(
+                    saldo=Decimal(str(random.randint(SALDO_MIN, SALDO_MAX)))
+                )
+            inc('depositos', len(cuentas_sin_saldo))
+            print(f'  Depositados: {len(cuentas_sin_saldo)} en {time.time()-t0:.1f}s')
+            cuentas_con_saldo = list(qs.filter(saldo__gte=1000).select_related('cliente__usuario'))
 
-    alias_destinos = [c.alias or str(c.id) for c in cuentas]
+        if not cuentas_con_saldo:
+            print('  No hay cuentas con saldo suficiente.')
+            return
 
-    pf_prob = args.plazos_fijos
-    tareas = [(cta.cliente.id, cta.id, alias_destinos, args.prestamos, pf_prob) for cta in cuentas]
-    random.shuffle(tareas)
+        print(f'\nGenerando operaciones sobre {len(cuentas_con_saldo)} cuentas...')
+        t0 = time.time()
 
-    with ThreadPoolExecutor(max_workers=workers) as ex:
-        futuros = [ex.submit(worker_operaciones, *t) for t in tareas[:200]]
-        for f in as_completed(futuros):
-            f.result()
+        alias_destinos = [c.alias or str(c.id) for c in cuentas_con_saldo]
+        pf_prob = args.plazos_fijos
+        tareas = [(c.cliente.id, c.id, alias_destinos, args.prestamos, pf_prob)
+                  for c in cuentas_con_saldo]
+        random.shuffle(tareas)
 
-    print(f'  Operaciones completadas en {time.time()-t0:.1f}s')
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futuros = [ex.submit(worker_operaciones, *t) for t in tareas]
+            for f in as_completed(futuros):
+                f.result()
 
-    # RESULTADOS
+        print(f'  Operaciones completadas en {time.time()-t0:.1f}s')
+
+    # Resultados
     duracion = time.time() - inicio
     print()
     print('=' * 55)
     print('  RESULTADOS')
     print('=' * 55)
-    print(f'  Usuarios creados:       {stats["usuarios_creados"]}')
-    print(f'  Depositos realizados:   {stats["depositos"]}')
-    print(f'  Transferencias OK:      {stats["transfers_ok"]}')
-    print(f'  Transferencias fallidas:{stats["transfers_fail"]}')
-    print(f'  Prestamos OK:           {stats["prestamos_ok"]}')
-    print(f'  Prestamos rechazados:   {stats["prestamos_fail"]}')
-    print(f'  Cuotas pagadas:         {stats["cuotas_pagadas"]}')
-    print(f'  Plazos fijos creados:   {stats["pf_creados"]}')
-    print(f'  Plazos fijos cancelados:{stats["pf_cancelados"]}')
-    print(f'  Errores:                {stats["errores"]}')
-    print(f'  Duracion:               {duracion:.1f}s')
+    for k, v in stats.items():
+        if v > 0:
+            print(f'  {k}: {v}')
+    print(f'  Duracion: {duracion:.1f}s')
     print()
 
-    # LOG
+    # Log
     with open(LOG_FILE, 'a', encoding='utf-8') as f:
         f.write('\n')
         f.write('=' * 60 + '\n\n')
-        f.write(f'GENERACION DE OPERACIONES\n')
+        f.write(f'GENERACION DE DATOS\n')
         f.write(f'Inicio: {datetime.fromtimestamp(inicio).strftime("%Y-%m-%d %H:%M:%S")}\n')
         f.write(f'Fin: {datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H:%M:%S")}\n')
         f.write(f'Duracion: {duracion:.1f}s\n')
+        f.write('Flags:')
+        if args.crear: f.write(f' --crear={args.crear}')
+        if args.entre_si: f.write(f' --entre-si')
+        if args.operaciones: f.write(f' --operaciones')
+        f.write('\n')
         f.write('=' * 60 + '\n\n')
         f.write('Resultados:\n')
         for k, v in stats.items():
-            f.write(f'  {k}: {v}\n')
+            if v > 0:
+                f.write(f'  {k}: {v}\n')
         f.write('\n')
         if usuarios_log:
             f.write(f'Usuarios creados (contrasenha: {args.password}):\n')
