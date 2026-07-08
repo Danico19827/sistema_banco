@@ -11,3 +11,6 @@ __pycache__/
 
 # Ignorar logs de scripts con listas de usuarios
 scripts/*.txt
+
+# Ignorar base de datos SQLite (usamos PostgreSQL)
+db.sqlite3
