@@ -7,7 +7,7 @@ from infrastructure.auth_views import (
     PrestamoListView, PrestamoCrearView, PrestamoDetalleView,
     MetricasView, HistorialView,
     PlazoFijoListView, PlazoFijoCrearView, PlazoFijoCancelarView,
-    DepositarView,
+    DepositarView, PerfilView,
 )
 
 
@@ -28,5 +28,6 @@ urlpatterns = [
     path('plazos-fijos/<int:pk>/cancelar/', PlazoFijoCancelarView.as_view(), name='plazofijo_cancelar'),
     path('depositar/', DepositarView.as_view(), name='depositar'),
     path('historial/', HistorialView.as_view(), name='historial'),
+    path('perfil/', PerfilView.as_view(), name='perfil'),
 ]
 

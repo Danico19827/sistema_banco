@@ -147,13 +147,38 @@ class HistorialView(LoginRequiredMixin, ListView):
 
 class TransferenciaView(LoginRequiredMixin, TemplateView):
     template_name = 'transferencia.html'
+    UMBRAL_2FA = Decimal('10000.00')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['cuentas'] = self.request.user.cliente.cuentas.filter(estado='activa')
+        context['otp_pendiente'] = self.request.session.get('otp_codigo') is not None
         return context
 
     def post(self, request, *args, **kwargs):
+        config = request.user.cliente.configuracion_seguridad
+
+        # Verificar OTP si está pendiente
+        codigo_ingresado = request.POST.get('codigo_otp', '').strip()
+        if codigo_ingresado:
+            otp_codigo = request.session.pop('otp_codigo', None)
+            otp_expira = request.session.pop('otp_expira', None)
+            otp_datos = request.session.pop('otp_datos', None)
+
+            if otp_codigo is None or otp_expira is None or otp_datos is None:
+                messages.error(request, 'No hay un código OTP pendiente. Iniciá la transferencia de nuevo.')
+                return redirect('transferencia')
+
+            if timezone.now() > otp_expira:
+                messages.error(request, 'El código OTP expiró. Iniciá la transferencia de nuevo.')
+                return redirect('transferencia')
+
+            if str(otp_codigo) != codigo_ingresado:
+                messages.error(request, 'Código OTP incorrecto.')
+                return redirect('transferencia')
+
+            return self._ejecutar_transferencia(request, otp_datos)
+
         cuenta_origen_id = request.POST.get('cuenta_origen')
         destino_raw = request.POST.get('cuenta_destino', '').strip()
         monto_str = request.POST.get('monto', '0')
@@ -170,6 +195,33 @@ class TransferenciaView(LoginRequiredMixin, TemplateView):
         if not destino_raw:
             messages.error(request, 'Debe indicar una cuenta destino.')
             return redirect('transferencia')
+
+        if config.doble_factor_activo and monto >= self.UMBRAL_2FA:
+            import random
+            otp = random.randint(100000, 999999)
+            request.session['otp_codigo'] = str(otp)
+            request.session['otp_expira'] = timezone.now() + timedelta(minutes=5)
+            request.session['otp_datos'] = {
+                'cuenta_origen_id': cuenta_origen_id,
+                'destino_raw': destino_raw,
+                'monto': str(monto),
+                'descripcion': concepto,
+            }
+            messages.info(request, f'Código OTP generado. Ingresalo para confirmar la transferencia.')
+            return redirect('transferencia')
+
+        return self._ejecutar_transferencia(request, {
+            'cuenta_origen_id': cuenta_origen_id,
+            'destino_raw': destino_raw,
+            'monto': str(monto),
+            'descripcion': concepto,
+        })
+
+    def _ejecutar_transferencia(self, request, datos):
+        cuenta_origen_id = datos['cuenta_origen_id']
+        destino_raw = datos['destino_raw']
+        monto = Decimal(datos['monto'])
+        concepto = datos.get('descripcion', '')
 
         repo_cuenta = DjangoCuentaRepository()
         repo_tx = DjangoTransaccionRepository()
@@ -548,4 +600,21 @@ class DepositarView(LoginRequiredMixin, TemplateView):
 
         messages.success(request, f'Se cargaron ${monto:,.2f} en tu cuenta.')
         return redirect('panel')
+
+
+class PerfilView(LoginRequiredMixin, TemplateView):
+    template_name = 'perfil.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['config'] = self.request.user.cliente.configuracion_seguridad
+        return context
+
+    def post(self, request, *args, **kwargs):
+        config = request.user.cliente.configuracion_seguridad
+        config.doble_factor_activo = request.POST.get('doble_factor') == 'on'
+        config.save()
+        estado = 'activado' if config.doble_factor_activo else 'desactivado'
+        messages.success(request, f'2FA {estado} correctamente.')
+        return redirect('perfil')
     

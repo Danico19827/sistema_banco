@@ -5,45 +5,60 @@
 <div class="card card-wide">
   <div class="card-logo">
     <h1>Nueva Transferencia</h1>
-    <p>Completá los datos para realizar la transferencia</p>
+    <p>{% if otp_pendiente %}Confirmá la transferencia con tu código OTP{% else %}Completá los datos para realizar la transferencia{% endif %}</p>
   </div>
   <form method="post" novalidate>
     {% csrf_token %}
-    <div class="field-group">
-      <label for="cuenta_origen">Cuenta origen</label>
-      <select name="cuenta_origen" id="cuenta_origen" required>
-        <option value="">Seleccionar cuenta</option>
-        {% for c in cuentas %}
-          <option value="{{ c.id }}">{{ c.get_tipo_cuenta_display }} — {{ c.numero_cuenta }} ({{ c.moneda }} ${{ c.saldo|floatformat:2|intcomma }})</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="field-group">
-      <label for="cuenta_destino">Cuenta destino</label>
-      <input type="text" name="cuenta_destino" id="cuenta_destino"
-             placeholder="CVU, alias o número de cuenta"
-             autocomplete="off"
-             aria-label="Cuenta destino" required>
-    </div>
-    <div class="field-group">
-      <label for="monto">Monto</label>
-      <input type="text" name="monto" id="monto"
-             data-currency
-             autocomplete="off"
-             aria-label="Monto a transferir" required>
-    </div>
-    <div class="field-group">
-      <label for="concepto">Concepto</label>
-      <input type="text" name="concepto" id="concepto"
-             placeholder="Ej: Pago de servicios"
-             autocomplete="off"
-             aria-label="Concepto de la transferencia">
-      <span class="help-text">Opcional: describí el motivo de la transferencia</span>
-    </div>
-    <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
-      <a href="{% url 'panel' %}" class="btn btn-secondary" style="flex: 1;">Cancelar</a>
-      <button type="submit" class="btn btn-primary" style="flex: 3;">Transferir</button>
-    </div>
+
+    {% if otp_pendiente %}
+      <div style="background: #fffbeb; border: 1px solid #f6e05e; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+        <div style="font-size: 0.875rem; font-weight: 600; color: #92400e;">Verificación de dos factores</div>
+        <div style="font-size: 0.75rem; color: #a0aec0; margin-bottom: 0.75rem;">
+          Tenés 5 minutos para ingresar el código. La transferencia está preautorizada pero necesita confirmación.
+        </div>
+        <label for="codigo_otp" style="font-size: 0.875rem; font-weight: 500;">Código de verificación</label>
+        <input type="text" name="codigo_otp" id="codigo_otp" inputmode="numeric" pattern="\d{6}"
+               maxlength="6" placeholder="000000" autocomplete="off" required
+               style="font-size: 1.5rem; letter-spacing: 0.5rem; text-align: center; font-weight: 700;">
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Confirmar transferencia</button>
+    {% else %}
+      <div class="field-group">
+        <label for="cuenta_origen">Cuenta origen</label>
+        <select name="cuenta_origen" id="cuenta_origen" required>
+          <option value="">Seleccionar cuenta</option>
+          {% for c in cuentas %}
+            <option value="{{ c.id }}">{{ c.get_tipo_cuenta_display }} — {{ c.numero_cuenta }} ({{ c.moneda }} ${{ c.saldo|floatformat:2|intcomma }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field-group">
+        <label for="cuenta_destino">Cuenta destino</label>
+        <input type="text" name="cuenta_destino" id="cuenta_destino"
+               placeholder="CVU, alias o número de cuenta"
+               autocomplete="off"
+               aria-label="Cuenta destino" required>
+      </div>
+      <div class="field-group">
+        <label for="monto">Monto</label>
+        <input type="text" name="monto" id="monto"
+               data-currency
+               autocomplete="off"
+               aria-label="Monto a transferir" required>
+      </div>
+      <div class="field-group">
+        <label for="concepto">Concepto</label>
+        <input type="text" name="concepto" id="concepto"
+               placeholder="Ej: Pago de servicios"
+               autocomplete="off"
+               aria-label="Concepto de la transferencia">
+        <span class="help-text">Opcional: describí el motivo de la transferencia</span>
+      </div>
+      <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
+        <a href="{% url 'panel' %}" class="btn btn-secondary" style="flex: 1;">Cancelar</a>
+        <button type="submit" class="btn btn-primary" style="flex: 3;">Transferir</button>
+      </div>
+    {% endif %}
   </form>
 </div>
 {% endblock %}
