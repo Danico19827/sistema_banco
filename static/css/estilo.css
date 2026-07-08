@@ -515,6 +515,51 @@ form {
   background: #e53e3e;
 }
 
+.status-badge.pendiente {
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.status-badge.pendiente::before {
+  background: #d69e2e;
+}
+
+.status-badge.vencida, .status-badge.vencido {
+  background: #fed7d7 !important;
+  color: #9b2c2c !important;
+}
+
+.status-badge.vencida::before, .status-badge.vencido::before {
+  background: #e53e3e !important;
+}
+
+.status-badge.pagada, .status-badge.pagado {
+  background: #f0fff4;
+  color: #22543d;
+}
+
+.status-badge.pagada::before, .status-badge.pagado::before {
+  background: #38a169;
+}
+
+.status-badge.cancelado {
+  background: #edf2f7;
+  color: #4a5568;
+}
+
+.status-badge.cancelado::before {
+  background: #a0aec0;
+}
+
+.status-badge.bloqueada {
+  background: #fff5f5;
+  color: #9b2c2c;
+}
+
+.status-badge.bloqueada::before {
+  background: #e53e3e;
+}
+
 .section-title {
   font-size: 1.125rem;
   font-weight: 600;

@@ -8,3 +8,6 @@ __pycache__/
 
 # Ignorar variables de entorno
 .env
+
+# Ignorar logs de scripts con listas de usuarios
+scripts/*.txt

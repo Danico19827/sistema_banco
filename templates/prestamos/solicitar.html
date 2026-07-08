@@ -1,29 +1,30 @@
 {% extends 'base.html' %}
 {% load humanize %}
+{% load static %}
 {% block title %}Solicitar Préstamo - Banco Hexagonal{% endblock %}
 {% block content %}
 <div class="card card-wide" style="max-width: 690px; width: 100%; margin: 0 auto;">
   <div class="card-logo">
     <h1>Solicitar Préstamo</h1>
-    <p>Completá los datos para simular tu préstamo</p>
+    <p>Completá los datos y solicitá tu préstamo</p>
   </div>
 
   <form method="post" novalidate>
     {% csrf_token %}
-    <input type="hidden" name="accion" value="simular">
 
     <div class="field-group">
       <label for="monto">Monto solicitado</label>
-      <input type="number" name="monto" id="monto" step="0.01" min="1000" max="1000000"
-             value="{{ monto|default:'50000' }}"
+      <input type="text" name="monto" id="monto"
+             data-currency
+             value="50000"
              aria-label="Monto del préstamo" required>
-      <span class="help-text">Mínimo $1,000 — Máximo $1,000,000</span>
+      <span class="help-text">Mínimo $1.000 — Máximo $1.000.000</span>
     </div>
 
     <div class="field-group">
       <label for="plazo">Plazo en meses</label>
       <input type="number" name="plazo" id="plazo" min="3" max="60"
-             value="{{ plazo|default:'12' }}"
+             value="12"
              aria-label="Plazo del préstamo" required>
       <span class="help-text">Mínimo 3 meses — Máximo 60 meses</span>
     </div>
@@ -31,57 +32,38 @@
     <div class="field-group">
       <label for="sistema">Sistema de amortización</label>
       <select name="sistema" id="sistema" aria-label="Sistema de amortización">
-        <option value="frances" {% if sistema == 'frances' %}selected{% endif %}>Francés (cuota fija)</option>
-        <option value="aleman" {% if sistema == 'aleman' %}selected{% endif %}>Alemán (cuota decreciente)</option>
+        <option value="frances">Francés (cuota fija)</option>
+        <option value="aleman">Alemán (cuota decreciente)</option>
       </select>
     </div>
 
-    <button type="submit" class="btn btn-primary btn-full">Simular</button>
-  </form>
-
-  {% if simulacion %}
-    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 1.5rem 0;">
-
-    <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem;">Resultado de la simulación</h3>
-    <p style="font-size: 0.8125rem; color: #718096; margin-bottom: 0.5rem;">Tasa anual: {{ tasa|floatformat:1 }}% &middot; {{ simulacion|length }} cuotas</p>
-
-    <div class="table-container" style="margin-bottom: 1rem; width: 100%; overflow-x: auto; display: block; -webkit-overflow-scrolling: touch;">
-      <table class="transactions-table" style="width: 100%; min-width: 600px; border-collapse: collapse;">
-        <thead>
-          <tr>
-            <th>Cuota</th>
-            <th style="text-align: right;">Monto</th>
-            <th style="text-align: right;">Interés</th>
-            <th style="text-align: right;">Amortización</th>
-            <th style="text-align: right;">Saldo pendiente</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for c in simulacion %}
-            <tr>
-              <td>{{ c.numero }}</td>
-              <td class="amount">${{ c.monto_cuota|floatformat:2|intcomma }}</td>
-              <td class="amount amount-negative">${{ c.interes|floatformat:2|intcomma }}</td>
-              <td class="amount amount-positive">${{ c.amortizacion|floatformat:2|intcomma }}</td>
-              <td class="amount">${{ c.saldo_pendiente|floatformat:2|intcomma }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="field-group">
+      <label for="cuenta_id">Acreditar en cuenta</label>
+      <select name="cuenta_id" id="cuenta_id" aria-label="Cuenta destino" required>
+        <option value="">Seleccionar cuenta</option>
+        {% for c in cuentas %}
+          <option value="{{ c.id }}">{{ c.get_tipo_cuenta_display }} — {{ c.numero_cuenta }} ({{ c.moneda }} ${{ c.saldo|floatformat:2|intcomma }})</option>
+        {% endfor %}
+      </select>
     </div>
 
-    <form method="post" novalidate>
-      {% csrf_token %}
-      <input type="hidden" name="accion" value="confirmar">
-      <input type="hidden" name="monto" value="{{ monto }}">
-      <input type="hidden" name="plazo" value="{{ plazo }}">
-      <input type="hidden" name="sistema" value="{{ sistema }}">
-      <button type="submit" class="btn btn-primary btn-full">Confirmar y solicitar préstamo</button>
-    </form>
-  {% endif %}
+    <div class="field-group" style="flex-direction: row; align-items: center; gap: 0.5rem;">
+      <input type="checkbox" name="debito_automatico" id="debito_automatico" checked>
+      <label for="debito_automatico" style="margin-bottom: 0; cursor: pointer;">Débito automático</label>
+      <span class="help-text" style="margin-left: 0.25rem;">Las cuotas se debitarán automáticamente de tu cuenta al vencimiento</span>
+    </div>
+
+    <div id="preview-tabla" style="margin-bottom: 1rem;">
+      <p style="color:#a0aec0;text-align:center;padding:1rem;">Completá los datos para ver la previsualización</p>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-full">Solicitar Préstamo</button>
+  </form>
 
   <div class="footer-text" style="margin-top: 1.5rem;">
     <a href="{% url 'prestamos' %}">Volver a mis préstamos</a>
   </div>
 </div>
+
+<script src="{% static 'js/prestamo_calc.js' %}"></script>
 {% endblock %}

@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Historial de Movimientos - Banco Hexagonal{% endblock %}
+{% block content %}
+<div class="card card-wide" style="max-width: 900px; width: 100%; margin: 0 auto;">
+  <div class="card-logo">
+    <h1>Historial de Movimientos</h1>
+    <p>Todas tus transacciones, con filtros y paginación</p>
+  </div>
+
+  <form method="get" style="display: flex; gap: 0.75rem; align-items: end; flex-wrap: wrap; margin-bottom: 1.5rem;">
+    <div>
+      <label for="tipo" style="font-size: 0.75rem; color: #718096;">Tipo</label>
+      <select name="tipo" id="tipo" style="padding: 0.4rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 6px;">
+        <option value="">Todos</option>
+        {% for k, v in tipos %}
+          <option value="{{ k }}" {% if filtro_tipo == k %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="desde" style="font-size: 0.75rem; color: #718096;">Desde</label>
+      <input type="date" name="desde" id="desde" value="{{ filtro_desde }}" style="padding: 0.4rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 6px;">
+    </div>
+    <div>
+      <label for="hasta" style="font-size: 0.75rem; color: #718096;">Hasta</label>
+      <input type="date" name="hasta" id="hasta" value="{{ filtro_hasta }}" style="padding: 0.4rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 6px;">
+    </div>
+    <button type="submit" class="btn btn-primary" style="padding: 0.4rem 1rem;">Filtrar</button>
+    <a href="{% url 'historial' %}" style="padding: 0.4rem 1rem; color: #718096; text-decoration: none;">Limpiar</a>
+  </form>
+
+  {% if transacciones %}
+    <div class="table-container">
+      <table class="transactions-table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Tipo</th>
+            <th>Descripción</th>
+            <th style="text-align: right;">Monto</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in transacciones %}
+            <tr>
+              <td>{{ t.fecha_creacion|date:"d/m/Y H:i" }}</td>
+              <td>{{ t.get_tipo_display }}</td>
+              <td>{{ t.descripcion|default:"-" }}</td>
+              <td class="amount {% if t.cuenta_origen_id in cuentas_ids %}amount-negative{% else %}amount-positive{% endif %}">
+                {% if t.cuenta_origen_id not in cuentas_ids %}+{% endif %}${{ t.monto|floatformat:2|intcomma }}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination" style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 1.5rem;">
+      {% if page_obj.has_previous %}
+        <a href="?page=1{% if filtro_tipo %}&tipo={{ filtro_tipo }}{% endif %}{% if filtro_desde %}&desde={{ filtro_desde }}{% endif %}{% if filtro_hasta %}&hasta={{ filtro_hasta }}{% endif %}" style="padding: 0.3rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 4px; color: #4a5568; text-decoration: none;">&laquo;</a>
+        <a href="?page={{ page_obj.previous_page_number }}{% if filtro_tipo %}&tipo={{ filtro_tipo }}{% endif %}{% if filtro_desde %}&desde={{ filtro_desde }}{% endif %}{% if filtro_hasta %}&hasta={{ filtro_hasta }}{% endif %}" style="padding: 0.3rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 4px; color: #4a5568; text-decoration: none;">{{ page_obj.previous_page_number }}</a>
+      {% endif %}
+      <span style="padding: 0.3rem 0.6rem; font-weight: 600; color: #1a202c;">{{ page_obj.number }}</span>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if filtro_tipo %}&tipo={{ filtro_tipo }}{% endif %}{% if filtro_desde %}&desde={{ filtro_desde }}{% endif %}{% if filtro_hasta %}&hasta={{ filtro_hasta }}{% endif %}" style="padding: 0.3rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 4px; color: #4a5568; text-decoration: none;">{{ page_obj.next_page_number }}</a>
+        <a href="?page={{ page_obj.paginator.num_pages }}{% if filtro_tipo %}&tipo={{ filtro_tipo }}{% endif %}{% if filtro_desde %}&desde={{ filtro_desde }}{% endif %}{% if filtro_hasta %}&hasta={{ filtro_hasta }}{% endif %}" style="padding: 0.3rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 4px; color: #4a5568; text-decoration: none;">&raquo;</a>
+      {% endif %}
+    </div>
+  {% else %}
+    <div style="text-align: center; padding: 3rem 1rem; color: #718096;">
+      <p style="font-size: 1.125rem;">No hay movimientos{% if filtro_tipo or filtro_desde or filtro_hasta %} con esos filtros{% endif %}.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

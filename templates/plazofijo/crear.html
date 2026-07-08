@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load static %}
+{% block title %}Constituir Plazo Fijo - Banco Hexagonal{% endblock %}
+{% block content %}
+<div class="card card-wide" style="max-width: 600px; width: 100%; margin: 0 auto;">
+  <div class="card-logo">
+    <h1>Constituir Plazo Fijo</h1>
+    <p>Inmovilizá tu dinero y generá intereses</p>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="field-group">
+      <label for="cuenta_id">Cuenta de origen</label>
+      <select name="cuenta_id" id="cuenta_id" aria-label="Seleccionar cuenta" required>
+        {% for c in cuentas %}
+          <option value="{{ c.id }}">{{ c.numero_cuenta }} — ${{ c.saldo|floatformat:2|intcomma }} ({{ c.get_tipo_cuenta_display }})</option>
+        {% empty %}
+          <option value="">No tenés cuentas activas</option>
+        {% endfor %}
+      </select>
+      <span class="help-text">Se debitará el monto de esta cuenta</span>
+    </div>
+
+    <div class="field-group">
+      <label for="monto">Monto a constituir</label>
+      <input type="text" name="monto" id="monto"
+             data-currency
+             aria-label="Monto del plazo fijo" required>
+      <span class="help-text">Mínimo $100</span>
+    </div>
+
+    <div class="field-group">
+      <label for="plazo_dias">Plazo en días</label>
+      <input type="number" name="plazo_dias" id="plazo_dias" min="30" max="365"
+             value="30" aria-label="Plazo en días" required>
+      <span class="help-text">Mínimo 30 días — Máximo 365 días</span>
+    </div>
+
+    <div id="preview-plazofijo" style="margin-bottom: 1rem;">
+      <div style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:0.75rem 1rem;">
+        <div style="font-size:0.75rem;color:#a0aec0;text-align:center;">Completá los datos para ver la previsualización</div>
+      </div>
+    </div>
+
+    <div style="background: #f7fafc; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; border: 1px solid #e2e8f0;">
+      <div style="font-size: 0.75rem; color: #718096; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.5rem;">
+        Información del Plazo Fijo
+      </div>
+      <div style="font-size: 0.875rem; color: #4a5568;">
+        <p>Tasa de interés anual: <strong>8.0%</strong></p>
+        <p>Los intereses se calculan al vencimiento según la cantidad de días.</p>
+        <p style="font-size: 0.75rem; color: #a0aec0; margin-top: 0.25rem;">Cancelación anticipada: recibís el capital + 50% de los intereses devengados.</p>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-full">Constituir Plazo Fijo</button>
+  </form>
+
+  <div class="footer-text" style="margin-top: 1.5rem;">
+    <a href="{% url 'plazofijo' %}">Volver a mis plazos fijos</a>
+  </div>
+</div>
+
+<script src="{% static 'js/plazofijo_calc.js' %}"></script>
+{% endblock %}

@@ -29,6 +29,16 @@
       <div>
         <span class="status-badge {{ prestamo.estado }}">{{ prestamo.get_estado_display }}</span>
       </div>
+      <div>
+        <div style="font-size: 0.75rem; color: #a0aec0; text-transform: uppercase; letter-spacing: 0.04em;">Débito</div>
+        <div style="font-weight: 600; font-size: 1rem;">
+          {% if prestamo.debito_automatico %}
+            <span style="color: #38a169;">Automático ✓</span>
+          {% else %}
+            <span style="color: #a0aec0;">Manual</span>
+          {% endif %}
+        </div>
+      </div>
     </div>
   </div>
 

@@ -7,7 +7,8 @@ from .models import (
     Prestamo,
     CuotaPrestamo,
     Transaccion,
-    AlertaFraude
+    AlertaFraude,
+    PlazoFijo,
 )
 
 # Registramos todos los modelos para que el Administrador tenga control total
@@ -19,3 +20,4 @@ admin.site.register(Prestamo)
 admin.site.register(CuotaPrestamo)
 admin.site.register(Transaccion)
 admin.site.register(AlertaFraude)
+admin.site.register(PlazoFijo)

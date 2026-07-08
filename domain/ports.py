@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
+from datetime import date
 from decimal import Decimal
 from typing import Any, Dict, Optional, List
-from .entities import CuentaEntity, TransaccionEntity, PrestamoEntity, CuotaEntity
+from .entities import CuentaEntity, TransaccionEntity, PrestamoEntity, CuotaEntity, PlazoFijoEntity
 
 
 class RepositorioCuenta(ABC):
@@ -97,4 +98,38 @@ class RepositorioCliente(ABC):
     @abstractmethod
     def obtener_datos_riesgo_por_edad(self) -> List[dict]:
         """Declaración del nuevo puerto."""
+        ...
+
+
+class MotorFraud(ABC):
+    @abstractmethod
+    def evaluar(self, monto: float, hora: int, dia_semana: int,
+                 cantidad_ultimas_24h: int, saldo_origen: float) -> float:
+        """Retorna score de riesgo de fraude: 0.0 (normal) a 1.0 (fraude)"""
+        ...
+
+
+class MotorScoring(ABC):
+    @abstractmethod
+    def evaluar(self, cliente_id: int) -> float:
+        """Retorna score de riesgo crediticio: 0.0 (bajo riesgo) a 1.0 (alto riesgo)"""
+        ...
+
+
+class RepositorioPlazoFijo(ABC):
+
+    @abstractmethod
+    def crear(self, plazo: PlazoFijoEntity) -> PlazoFijoEntity:
+        ...
+
+    @abstractmethod
+    def listar_por_cliente(self, cliente_id: int) -> List[PlazoFijoEntity]:
+        ...
+
+    @abstractmethod
+    def buscar_por_id(self, plazo_id: int) -> Optional[PlazoFijoEntity]:
+        ...
+
+    @abstractmethod
+    def cancelar(self, plazo_id: int) -> None:
         ...

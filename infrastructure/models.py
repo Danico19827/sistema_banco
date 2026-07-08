@@ -1,3 +1,4 @@
+import unicodedata
 import uuid
 from django.db import models
 from django.contrib.auth.models import User
@@ -87,7 +88,35 @@ class Cuenta(models.Model):
     def save(self, *args, **kwargs):
         if not self.numero_cuenta:
             self.numero_cuenta = uuid.uuid4().hex[:12].upper()
+        if not self.alias:
+            self.alias = self._generar_alias()
+        if not self.cvu:
+            self.cvu = self._generar_cvu()
         super().save(*args, **kwargs)
+
+    def _generar_alias(self):
+        def limpiar(texto):
+            texto = unicodedata.normalize('NFKD', texto).encode('ascii', 'ignore').decode()
+            return ''.join(c for c in texto if c.isalnum()).lower()
+        usuario = self.cliente.usuario
+        if usuario.first_name and usuario.last_name:
+            base = f"{limpiar(usuario.first_name)}.{limpiar(usuario.last_name)}"
+        else:
+            base = limpiar(usuario.username)
+        sufijo = uuid.uuid4().hex[:4]
+        alias = f"{base}.{sufijo}"[:20]
+        if not alias.endswith(sufijo):
+            alias = f"{base[:15]}.{sufijo}"[:20]
+        while Cuenta.objects.filter(alias=alias).exists():
+            sufijo = uuid.uuid4().hex[:4]
+            alias = f"{base[:15]}.{sufijo}"[:20]
+        return alias
+
+    def _generar_cvu(self):
+        cvu = '0' + str(uuid.uuid4().int % 10**21).zfill(21)
+        while Cuenta.objects.filter(cvu=cvu).exists():
+            cvu = '0' + str(uuid.uuid4().int % 10**21).zfill(21)
+        return cvu
 
     def __str__(self):
         return f"Cuenta {self.numero_cuenta} - {self.cliente.usuario.username}"
@@ -136,6 +165,7 @@ class Prestamo(models.Model):
     sistema_amortizacion = models.CharField(max_length=20, choices=SISTEMA_AMORTIZACION, default='frances')
     fecha_inicio = models.DateTimeField(auto_now_add=True)
     estado = models.CharField(max_length=20, choices=ESTADO_PRESTAMO, default='activo')
+    debito_automatico = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = 'Préstamo'
@@ -232,4 +262,29 @@ class AlertaFraude(models.Model):
     def __str__(self):
         estado_resolucion = "Resuelta" if self.resuelta else "Pendiente"
         return f"Alerta {self.id} - Transacción {self.transaccion.id} ({estado_resolucion})"
+
+class PlazoFijo(models.Model):
+    ESTADO_PLAZO = [
+        ('activo', 'Activo'),
+        ('vencido', 'Vencido'),
+        ('cancelado', 'Cancelado'),
+    ]
+
+    cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name='plazos_fijos')
+    cuenta = models.ForeignKey(Cuenta, on_delete=models.PROTECT, related_name='plazos_fijos')
+    monto = models.DecimalField(max_digits=12, decimal_places=2)
+    plazo_dias = models.IntegerField()
+    tasa_interes_anual = models.FloatField()
+    fecha_constitucion = models.DateTimeField(auto_now_add=True)
+    fecha_vencimiento = models.DateField()
+    monto_al_vencimiento = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
+    estado = models.CharField(max_length=20, choices=ESTADO_PLAZO, default='activo')
+
+    class Meta:
+        verbose_name = 'Plazo fijo'
+        verbose_name_plural = 'Plazos fijos'
+        ordering = ['-fecha_constitucion']
+
+    def __str__(self):
+        return f"Plazo Fijo {self.id} - {self.cliente.usuario.username} - ${self.monto}"
     

@@ -21,6 +21,13 @@
 11. [Datos Mock](#11-datos-mock-de-mentira)
 12. [Arquitectura: Híbrido Hexagonal + MTV](#12-arquitectura-híbrido-hexagonal--mtv)
 13. [Glosario Django](#13-glosario-django)
+14. [Cómo ejecutar el sistema](#14-cómo-ejecutar-el-sistema)
+15. [Concurrencia en Transferencias](#15-concurrencia-en-transferencias)
+16. [Machine Learning (Fraude + Scoring)](#16-machine-learning-en-el-sistema)
+17. [Plazo Fijo](#17-plazo-fijo)
+18. [Historial de Movimientos](#18-historial-de-movimientos-rf-06)
+19. [Débito Automático](#19-débito-automático-de-cuotas)
+20. [Scripts de generación de datos](#20-scripts-de-generación-de-datos)
 
 ---
 
@@ -77,6 +84,9 @@ Banco/
 │   │                          #    transferencia, préstamos)
 │   ├── signals.py             #   Señales (crear Cliente al crear User)
 │   ├── apps.py                #   Configuración de la app
+│   ├── management/             #   Comandos personalizados de Django
+│   │   └── commands/
+│   │       └── pagar_cuotas_vencidas.py  # Débito automático de cuotas
 │   ├── adapters/              #   Adaptadores hexagonales (IMPLEMENTADOS)
 │   │   ├── __init__.py
 │   │   └── repositories.py    #   DjangoCuentaRepository, etc.
@@ -1579,10 +1589,305 @@ python manage.py runserver
 | **`related_name`** | Nombre para acceder desde el otro lado de la relación. Ej: `cliente.cuentas.all()` |
 | **`|floatformat:2`** | Filtro de template: formatea un número con 2 decimales |
 | **`|intcomma`** | Filtro de template: agrega separadores de miles. Ej: `125430.50` → `125,430.50` |
-| **`python manage.py`** | Herramienta de línea de comandos de Django. Comandos comunes: `runserver` (iniciar el servidor), `check` (verificar errores), `makemigrations` (crear migraciones), `migrate` (aplicar migraciones) |
+| **Management Command** | Comando personalizado que se ejecuta con `python manage.py <nombre>`. Django busca automáticamente archivos `.py` dentro de `app/management/commands/` y los registra como comandos. Ej: `python manage.py pagar_cuotas_vencidas` |
+| **`python manage.py`** | Herramienta de línea de comandos de Django. Comandos comunes: `runserver`, `check`, `makemigrations`, `migrate`, y cualquier **Management Command** que hayas creado |
 | **`settings.py`** | Archivo de configuración global: apps instaladas, base de datos, zona horaria, rutas de archivos |
 
 ---
 
+---
+
+## 15. Concurrencia en Transferencias
+
+### ¿Por qué es importante?
+
+Imaginá que tenés $10.000 en tu cuenta y hacés dos transferencias de $8.000 al mismo tiempo:
+
+```
+Sin concurrencia:
+  Transferencia 1: lee saldo ($10.000) → descuenta $8.000 → guarda ($2.000)
+  Transferencia 2: lee saldo ($10.000) → descuenta $8.000 → guarda ($2.000)
+  ✗ Resultado: te quedan $2.000, pero gastaste $16.000. El banco perdió $6.000.
+  
+Con concurrencia (select_for_update):
+  Transferencia 1: BLOQUEA la cuenta → lee saldo ($10.000) → descuenta → guarda ($2.000) → LIBERA
+  Transferencia 2: ESPERA → cuando se libera, lee saldo ($2.000) → saldo insuficiente → RECHAZA
+  ✓ Resultado: una transferencia se realiza, la otra se rechaza. Correcto.
+```
+
+### Cómo lo implementamos
+
+```python
+# En el adaptador DjangoCuentaRepository (repositories.py)
+def buscar_por_id_con_bloqueo(self, cuenta_id: int):
+    return Cuenta.objects.select_for_update().get(id=cuenta_id)
+```
+
+`select_for_update()` es un bloqueo pesimista a nivel de base de datos. Cuando una transacción obtiene el bloqueo de una fila, **ninguna otra transacción puede leer ni modificar esa fila** hasta que la primera termine.
+
+### Doble bloqueo ordenado por ID (evita deadlocks)
+
+Cuando una transferencia involucra dos cuentas (origen y destino), necesitamos bloquear ambas. Pero si dos transferencias bloquean las cuentas en orden inverso, se produce un **deadlock**:
+
+```
+Transferencia A: BLOQUEA cuenta 1 → necesita cuenta 2 (espera)
+Transferencia B: BLOQUEA cuenta 2 → necesita cuenta 1 (espera)
+✗ Ambas esperan para siempre. Deadlock.
+```
+
+Solución: **bloquear siempre en orden ascendente de IDs**:
+
+```python
+# En RealizarTransferencia.ejecutar()
+ids = sorted([cuenta_origen_id, destino.id])  # Orden ascendente
+origen = repo_cuenta.buscar_por_id_con_bloqueo(ids[0])
+destino = repo_cuenta.buscar_por_id_con_bloqueo(ids[1])
+```
+
+Si siempre bloqueamos los IDs de menor a mayor, nunca habrá bloqueos circulares.
+
+### Updates atómicos con F()
+
+Para operaciones que solo modifican saldos (sin leer el valor anterior), usamos `F()` expressions:
+
+```python
+Cuenta.objects.filter(id=cuenta_id).update(saldo=F('saldo') + delta)
+```
+
+`F('saldo')` se refiere al valor actual de la columna `saldo` en la base de datos. Django genera SQL como `UPDATE cuenta SET saldo = saldo + 100 WHERE id = 1`. Esto es atómico a nivel de base de datos: no hay race condition entre leer y escribir.
+
+### Management command de débito automático
+
+El comando `pagar_cuotas_vencidas` usa `select_for_update()` para procesar cuotas:
+
+```python
+for cuota in cuotas_vencidas:
+    with transaction.atomic():
+        cuenta = Cuenta.objects.select_for_update().get(id=cuenta.id)
+        if cuenta.saldo >= cuota.monto_cuota:
+            Cuenta.objects.filter(id=cuenta.id).update(saldo=F('saldo') - cuota.monto_cuota)
+```
+
+Cada cuota se procesa en su propia transacción atómica. Si el saldo es insuficiente, salta esa cuota y sigue con la siguiente.
+
+---
+
+## 16. Machine Learning en el Sistema
+
+El sistema integra dos modelos de Machine Learning usando la arquitectura hexagonal (puertos y adaptadores):
+
+### 16.1 RF-07: Detección de Fraude (Isolation Forest)
+
+**Problema:** Detectar transferencias sospechosas en tiempo real.
+
+**Enfoque:** Aprendizaje no supervisado (anomaly detection). El modelo aprende **qué es normal** en las transacciones y marca lo que se desvía.
+
+**Features (características):**
+
+| Feature | Descripción |
+|---|---|
+| `monto` | Monto de la transferencia |
+| `hora` | Hora del día (0-23) |
+| `dia_semana` | Día de la semana (0-6) |
+| `saldo_origen` | Saldo de la cuenta de origen |
+
+**Entrenamiento:** 6.215 transacciones normales + 100 anomalías sintéticas. Accuracy: **97.3%**
+
+**Arquitectura (puerto y adaptador):**
+
+```
+domain/ports.py:MotorFraud(ABC)          ← Puerto (interfaz)
+    └── evaluar(monto, hora, dia_semana, ...) → float
+
+infrastructure/adapters/fraude_adapter.py  ← Adaptador
+    └── evaluar_transferencia(monto, cuenta_id) → score 0-1
+
+application/use_cases.py:RealizarTransferencia  ← Integración
+    └── Si score ≥ 0.7 → crea AlertaFraude
+```
+
+**Integración:** Cada transferencia que se realiza en el sistema pasa por el modelo. Si el score de riesgo supera 0.7, se crea un registro en `AlertaFraude` visible en `/admin/`.
+
+### 16.2 RF-15: Scoring Crediticio (Random Forest)
+
+**Problema:** Evaluar automáticamente si un cliente es buen pagador antes de aprobarle un préstamo.
+
+**Enfoque:** Aprendizaje supervisado. Se entrena con 223 clientes que ya tienen préstamos, etiquetados como "buen pagador" (pagó siempre a tiempo) o "mal pagador" (2+ cuotas vencidas).
+
+**Features:**
+
+| Feature | Descripción |
+|---|---|
+| `edad` | Edad del cliente |
+| `ingreso` | Ingreso mensual estimado |
+| `educacion` | Nivel educativo (1-5) |
+| `score_inicial` | Score crediticio al registrarse |
+| `antiguedad` | Días desde el registro |
+| `cant_prestamos` | Cantidad de préstamos tomados |
+| `genero` | Codificado one-hot |
+
+**Arquitectura:**
+
+```
+domain/ports.py:MotorScoring(ABC)        ← Puerto
+    └── evaluar(cliente_id) → float (0=bajo riesgo, 1=alto riesgo)
+
+infrastructure/adapters/scoring_adapter.py  ← Adaptador
+    └── evaluar_cliente(cliente_id) → score 0-1
+
+application/use_cases.py:SolicitarPrestamo  ← Integración
+    └── Si score ≥ 0.5 → rechaza préstamo
+```
+
+**Comportamiento:**
+
+| Cliente | Score | Resultado |
+|---|---|---|
+| Pagador puntual (sin vencidas) | ~0.16 | ✅ Préstamo aprobado |
+| Moroso (3 cuotas vencidas) | ~0.94 | ❌ Préstamo rechazado |
+
+### 16.3 Scripts de entrenamiento
+
+| Script | Modelo | Uso |
+|---|---|---|
+| `scripts/entrenar_fraude.py` | Isolation Forest | `python scripts/entrenar_fraude.py` |
+| `scripts/entrenar_scoring.py` | Random Forest | `python scripts/entrenar_scoring.py` |
+
+Ambos scripts leen datos de la base de datos actual, entrenan el modelo y lo serializan en `infrastructure/adapters/`. Se pueden re-ejecutar cuando haya más datos disponibles.
+
+---
+
+## 17. Plazo Fijo
+
+### ¿Qué es?
+
+Un plazo fijo es un producto donde el cliente **inmoviliza** un monto de dinero por un período determinado a cambio de un interés fijo.
+
+### Constitución (RF-13)
+
+**Ruta:** `/plazos-fijos/constituir/`
+
+1. El cliente selecciona la cuenta de débito, el monto y el plazo en días (30-365)
+2. El sistema muestra una **previsualización en vivo** con el capital, los intereses calculados (8% TNA) y el total al vencimiento
+3. Al confirmar, se debita el monto de la cuenta y se crea el plazo fijo
+
+**Cálculo:**
+```
+interés = capital × 0.08 × días / 365
+total_al_vencimiento = capital + interés
+```
+
+### Cancelación anticipada (RF-14)
+
+**Ruta:** `/plazos-fijos/<id>/cancelar/` (POST)
+
+Si el cliente cancela antes del vencimiento:
+
+```
+días_transcurridos = hoy - fecha_constitución
+interés_prorrateado = capital × 0.08 × días_transcurridos / 365
+penalización = interés_prorrateado × 50%
+devolución = capital + interés_prorrateado - penalización
+               = capital + interés_prorrateado × 50%
+```
+
+Si se cancela el mismo día, `días_transcurridos = 0`, por lo tanto `interés = 0` y se devuelve solo el capital. Esto evita el exploit de crear y cancelar inmediatamente para ganar intereses.
+
+### Preview con JavaScript
+
+En `static/js/plazofijo_calc.js`, el cálculo se actualiza automáticamente mientras el usuario escribe el monto y los días, sin necesidad de recargar la página.
+
+---
+
+## 18. Historial de Movimientos (RF-06)
+
+**Ruta:** `/historial/`
+
+Vista completa de todas las transacciones del cliente con:
+
+- **Paginación:** 25 transacciones por página
+- **Filtros:** por tipo de operación (transferencia, depósito, préstamo, plazo fijo) y por rango de fechas
+- **Orden:** del más reciente al más antiguo
+- **Indicador de signo:** las transacciones donde el cliente es el origen se muestran en rojo (dinero que sale), las que son destino en verde (dinero que entra)
+
+Implementado con `HistorialView(LoginRequiredMixin, ListView)` y paginación nativa de Django.
+
+---
+
+## 19. Débito Automático de Cuotas
+
+### Campo en el modelo
+
+```python
+# infrastructure/models.py
+class Prestamo(models.Model):
+    ...
+    debito_automatico = models.BooleanField(default=False)
+```
+
+Al solicitar un préstamo, el cliente puede marcar "Débito automático" (activado por defecto). Si está activo, las cuotas se pagan solas al vencimiento sin intervención del cliente.
+
+### ¿Por qué un Management Command y no una tarea programada (cron/Celery)?
+
+Django tiene un sistema llamado **Management Commands**: archivos Python dentro de `app/management/commands/` que se ejecutan con `python manage.py <nombre>`. Django los descubre automáticamente —no hay que registrarlos en ningún lado—.
+
+Elegimos esta opción por simplicidad académica. Alternativas más complejas serían:
+- **Celery:** requiere Redis/RabbitMQ, workers, colas. Sobredimensionado para este proyecto.
+- **Cron/Linux:** depende del sistema operativo. Windows tiene Task Scheduler pero es distinto.
+
+El Management Command se puede llamar manualmente o desde cualquier programador de tareas (Task Scheduler, cron, systemd timer). Es la opción más portable y fácil de entender.
+
+### ¿Dónde está el archivo?
+
+```
+infrastructure/
+├── management/
+│   └── commands/
+│       └── pagar_cuotas_vencidas.py    ← Django lo descubre automáticamente
+├── models.py
+├── auth_views.py
+...
+```
+
+Django busca carpetas `management/commands/` dentro de cada **app** instalada. Cualquier archivo `.py` que encuentre allí se convierte en un comando ejecutable. El nombre del archivo (sin `.py`) es el nombre del comando.
+
+### ¿Qué hace el comando?
+
+`python manage.py pagar_cuotas_vencidas`
+
+1. Busca todas las cuotas con `estado = 'pendiente'` y `fecha_vencimiento <= hoy` de préstamos que tengan `debito_automatico = True`
+2. Para cada cuota, dentro de una transacción atómica:
+   - Busca la primera cuenta activa del cliente
+   - Verifica saldo suficiente
+   - Si tiene saldo: debita usando `F('saldo') - monto` (atómico), marca la cuota como pagada, registra la transacción
+   - Si no tiene saldo: reporta el error y continúa con la siguiente
+3. Al final muestra un resumen de cuántas se pagaron y cuántas fallaron
+
+### Cómo automatizarlo
+
+En Windows, se puede agregar al **Task Scheduler** para que se ejecute todos los días a una hora fija. El comando a ejecutar sería:
+
+```bash
+python C:\ruta\al\proyecto\manage.py pagar_cuotas_vencidas
+```
+
+---
+
+## 20. Scripts de generación de datos
+
+El sistema incluye varios scripts para poblar la base de datos con datos de prueba:
+
+| Script | Propósito | Cómo ejecutar |
+|---|---|---|
+| `scripts/generar_datos.py` | Crea 100 usuarios completos con cuentas, alias, CVU, préstamos y transacciones | `python scripts/generar_datos.py` |
+| `scripts/generar_masivo.py` | Crea 500 usuarios + ~6.000 transferencias + préstamos + plazos fijos usando ThreadPoolExecutor | `python scripts/generar_masivo.py` |
+| `scripts/registro_masivo_concurrente.py` | Registra 20 usuarios vía HTTP concurrente para probar el endpoint | `python scripts/registro_masivo_concurrente.py` |
+| `scripts/entrenar_fraude.py` | Entrena el modelo Isolation Forest para detección de fraude | `python scripts/entrenar_fraude.py` |
+| `scripts/entrenar_scoring.py` | Entrena el modelo Random Forest para scoring crediticio | `python scripts/entrenar_scoring.py` |
+
+Los scripts `generar_datos.py` y `generar_masivo.py` dejan un archivo `.txt` con los usuarios creados y sus credenciales para facilitar el acceso.
+
+---
+
 *Documentación generada para el proyecto académico Banco Hexagonal.*  
-*Última actualización: Junio 2026*
+*Última actualización: Julio 2026*

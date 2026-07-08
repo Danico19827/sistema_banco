@@ -5,9 +5,12 @@ from typing import List, Optional
 from django.db import transaction
 from django.db.models import Q, F, Count, Sum
 
-from domain.entities import CuentaEntity, TransaccionEntity, PrestamoEntity, CuotaEntity
-from domain.ports import RepositorioCuenta, RepositorioTransaccion, RepositorioPrestamo, RepositorioCliente
-from infrastructure.models import ConfiguracionSeguridad, Cuenta, Transaccion, Prestamo, CuotaPrestamo, Cliente
+from domain.entities import CuentaEntity, TransaccionEntity, PrestamoEntity, CuotaEntity, PlazoFijoEntity
+from domain.ports import (
+    RepositorioCuenta, RepositorioTransaccion, RepositorioPrestamo,
+    RepositorioCliente, RepositorioPlazoFijo,
+)
+from infrastructure.models import ConfiguracionSeguridad, Cuenta, Transaccion, Prestamo, CuotaPrestamo, Cliente, PlazoFijo
 
 from typing import List, Optional, Dict, Any
 from django.db.models.functions import ExtractMonth, ExtractYear
@@ -82,11 +85,12 @@ class DjangoCuentaRepository(RepositorioCuenta):
 
     def buscar_por_alias_o_cvu(self, valor: str) -> Optional[CuentaEntity]:
         try:
-            c = Cuenta.objects.get(
-                Q(alias=valor) | Q(cvu=valor) | Q(numero_cuenta=valor) | Q(id=valor)
-            )
+            q = Q(alias=valor) | Q(cvu=valor) | Q(numero_cuenta=valor)
+            if valor.isdigit():
+                q |= Q(id=valor)
+            c = Cuenta.objects.get(q)
             return _cuenta_a_entity(c)
-        except (Cuenta.DoesNotExist, ValueError):
+        except Cuenta.DoesNotExist:
             return None
 
     def listar_por_cliente(self, cliente_id: int) -> List[CuentaEntity]:
@@ -284,8 +288,8 @@ class DjangoClienteRepository(RepositorioCliente):
         Categorías: Primario, Secundario, Terciario/Universitario.
         """
         ahora = timezone.now()
+        mes_actual = ahora.month
         
-        # 1. Agrupamos por mes y por el nivel educativo del cliente
         resultado_query = (
             Prestamo.objects
             .filter(fecha_inicio__year=ahora.year)
@@ -295,40 +299,34 @@ class DjangoClienteRepository(RepositorioCliente):
             .order_by('mes')
         )
         
-        # 2. Inicializamos las listas para los primeros 6 meses (Ene a Jun)
         estructura_vacia = {
-            'Primario': [0] * 6,
-            'Secundario': [0] * 6,
-            'Terciario/Universitario': [0] * 6
+            'Primario': [0] * mes_actual,
+            'Secundario': [0] * mes_actual,
+            'Terciario/Universitario': [0] * mes_actual
         }
         
-        # 3. Mapeo de cómo está en la BD a las claves del diccionario
-        # Ajustá las claves (izq) a los valores exactos de la base de datos
         map_educacion = {
             'primario': 'Primario',
             'secundario': 'Secundario',
             'terciario': 'Terciario/Universitario',
             'universitario': 'Terciario/Universitario',
-            'posgrado': 'Terciario/Universitario'  # Sumamos los posgrados a la categoría superior
+            'posgrado': 'Terciario/Universitario'
         }
         
-        # 4. Llenamos los campos correspondientes
         for fila in resultado_query:
             educacion_db = fila['cliente__nivel_educativo']
-            # Si viene algo raro o nulo, lo ignoramos o lo sumamos a alguna categoría por defecto
             educacion_vista = map_educacion.get(educacion_db)
             
-            if educacion_vista: # Solo si mapeó correctamente
+            if educacion_vista:
                 mes = fila['mes']
                 idx_mes = mes - 1
                 
-                if idx_mes < 6:
+                if idx_mes < mes_actual:
                     estructura_vacia[educacion_vista][idx_mes] += fila['cantidad']
         
-        # 5. Volvemos la lista acumulativa mes a mes
         for nivel in estructura_vacia:
             acumulado = 0
-            for i in range(6):
+            for i in range(mes_actual):
                 acumulado += estructura_vacia[nivel][i]
                 estructura_vacia[nivel][i] = acumulado
                     
@@ -374,4 +372,47 @@ class DjangoClienteRepository(RepositorioCliente):
             
         return resultado
 
+
+def _plazo_a_entity(p: PlazoFijo) -> PlazoFijoEntity:
+    return PlazoFijoEntity(
+        id=p.id,
+        cliente_id=p.cliente_id,
+        cuenta_id=p.cuenta_id,
+        monto=p.monto,
+        plazo_dias=p.plazo_dias,
+        tasa_interes_anual=p.tasa_interes_anual,
+        monto_al_vencimiento=p.monto_al_vencimiento,
+        fecha_constitucion=p.fecha_constitucion,
+        fecha_vencimiento=p.fecha_vencimiento,
+        estado=p.estado,
+    )
+
+
+class DjangoPlazoFijoRepository(RepositorioPlazoFijo):
+
+    def crear(self, plazo: PlazoFijoEntity) -> PlazoFijoEntity:
+        p = PlazoFijo.objects.create(
+            cliente_id=plazo.cliente_id,
+            cuenta_id=plazo.cuenta_id,
+            monto=plazo.monto,
+            plazo_dias=plazo.plazo_dias,
+            tasa_interes_anual=plazo.tasa_interes_anual,
+            monto_al_vencimiento=plazo.monto_al_vencimiento,
+            fecha_vencimiento=plazo.fecha_vencimiento,
+        )
+        return _plazo_a_entity(p)
+
+    def listar_por_cliente(self, cliente_id: int) -> List[PlazoFijoEntity]:
+        plazos = PlazoFijo.objects.filter(cliente_id=cliente_id).order_by('-fecha_constitucion')
+        return [_plazo_a_entity(p) for p in plazos]
+
+    def buscar_por_id(self, plazo_id: int) -> Optional[PlazoFijoEntity]:
+        try:
+            p = PlazoFijo.objects.get(id=plazo_id)
+            return _plazo_a_entity(p)
+        except PlazoFijo.DoesNotExist:
+            return None
+
+    def cancelar(self, plazo_id: int) -> None:
+        PlazoFijo.objects.filter(id=plazo_id).update(estado='cancelado')
     

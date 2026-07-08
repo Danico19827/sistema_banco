@@ -12,7 +12,10 @@
 
   <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem;">
     <h3 class="section-title" style="margin-bottom: 0;">Tus Cuentas</h3>
-    <a href="{% url 'transferencia' %}" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.8125rem;">Nueva transferencia</a>
+    <div style="display: flex; gap: 0.5rem;">
+      <a href="{% url 'depositar' %}" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.8125rem;">Cargar saldo</a>
+      <a href="{% url 'transferencia' %}" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.8125rem;">Nueva transferencia</a>
+    </div>
   </div>
 
   {% if cuentas %}
@@ -100,5 +103,36 @@
       <a href="{% url 'prestamos_solicitar' %}" class="btn btn-primary" style="margin-top: 0.5rem; padding: 0.375rem 0.75rem; font-size: 0.8125rem;">Solicitar uno</a>
     </div>
   {% endif %}
+
+  <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem;">
+    <h3 class="section-title" style="margin-bottom: 0;">Tus Plazos Fijos</h3>
+    <a href="{% url 'plazofijo' %}" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.8125rem;">Ver todos</a>
+  </div>
+
+  {% with plazos=user.cliente.plazos_fijos.all %}
+    {% if plazos %}
+      <div class="account-grid">
+        {% for p in plazos|slice:":3" %}
+          <div class="account-card" style="border-left-color: #805ad5;">
+            <div style="font-size: 0.8125rem; font-weight: 600; color: #1a202c; margin-bottom: 0.25rem;">Plazo Fijo #{{ p.id }}</div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: #1a202c;">${{ p.monto|floatformat:2|intcomma }}</div>
+            <div style="font-size: 0.75rem; color: #718096; margin-top: 0.25rem;">
+              {% if p.estado == 'activo' %}
+                Vence {{ p.fecha_vencimiento|date:"d/m/Y" }}
+              {% else %}
+                {{ p.get_estado_display }}
+              {% endif %}
+            </div>
+            <span class="status-badge {{ p.estado }}" style="margin-top: 0.5rem;">{{ p.get_estado_display }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div style="text-align: center; padding: 1.5rem; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0;">
+        <p style="font-size: 0.875rem; color: #718096;">No tenés plazos fijos.</p>
+        <a href="{% url 'plazofijo_crear' %}" class="btn btn-primary" style="margin-top: 0.5rem; padding: 0.375rem 0.75rem; font-size: 0.8125rem;">Constituir uno</a>
+      </div>
+    {% endif %}
+  {% endwith %}
 </div>
 {% endblock %}

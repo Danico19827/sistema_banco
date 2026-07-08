@@ -3,8 +3,11 @@ from datetime import date
 from decimal import Decimal
 from typing import List, Optional, Dict
 
-from domain.entities import CuentaEntity, TransaccionEntity, PrestamoEntity, CuotaEntity
-from domain.ports import RepositorioCuenta, RepositorioTransaccion, RepositorioPrestamo, RepositorioCliente
+from domain.entities import CuentaEntity, TransaccionEntity, PrestamoEntity, CuotaEntity, PlazoFijoEntity
+from domain.ports import (
+    RepositorioCuenta, RepositorioTransaccion, RepositorioPrestamo,
+    RepositorioCliente, RepositorioPlazoFijo, MotorFraud, MotorScoring,
+)
 from domain.rules import (
     validar_saldo_suficiente,
     validar_monto_positivo,
@@ -12,6 +15,9 @@ from domain.rules import (
     simular_cuotas_aleman,
     CuotaSimulada,
     calcular_score_crediticio,
+    calcular_interes_plazo_fijo,
+    calcular_monto_al_vencimiento,
+    TASA_PLAZO_FIJO,
 )
 
 
@@ -19,16 +25,22 @@ from domain.rules import (
 class ResultadoTransferencia:
     exitoso: bool
     mensaje: str
+    riesgo_fraude: float = 0.0
+    tx_id: Optional[int] = None
 
 
 class RealizarTransferencia:
+    UMBRAL_FRAUDE = 0.7
+
     def __init__(
         self,
         repo_cuenta: RepositorioCuenta,
         repo_tx: RepositorioTransaccion,
+        motor_fraude: Optional[MotorFraud] = None,
     ):
         self._repo_cuenta = repo_cuenta
         self._repo_tx = repo_tx
+        self._motor_fraude = motor_fraude
 
     def ejecutar(
         self,
@@ -65,7 +77,13 @@ class RealizarTransferencia:
         self._repo_cuenta.incrementar_saldo(cuenta_origen.id, -monto)
         self._repo_cuenta.incrementar_saldo(cuenta_destino.id, monto)
 
-        self._repo_tx.crear(TransaccionEntity(
+        riesgo = 0.0
+        if self._motor_fraude:
+            riesgo = self._motor_fraude.evaluar(
+                float(monto), cuenta_origen.id,
+            )
+
+        tx = self._repo_tx.crear(TransaccionEntity(
             id=0,
             tipo='transferencia',
             monto=monto,
@@ -73,17 +91,32 @@ class RealizarTransferencia:
             cuenta_destino_id=cuenta_destino.id,
             descripcion=descripcion or 'Transferencia',
             estado='completada',
+            riesgo_fraude=riesgo,
         ))
 
-        return ResultadoTransferencia(exitoso=True, mensaje='Transferencia realizada con éxito.')
+        mensaje = 'Transferencia realizada con éxito.'
+        if riesgo >= self.UMBRAL_FRAUDE:
+            mensaje += f' (Riesgo detectado: {riesgo:.2f})'
+
+        return ResultadoTransferencia(
+            exitoso=True, mensaje=mensaje,
+            riesgo_fraude=riesgo, tx_id=tx.id,
+        )
 
 
 class SolicitarPrestamo:
-    TASA_ANUAL = 0.05  # 5% anual fija
+    TASA_ANUAL = 0.05
+    UMBRAL_SCORING = 0.5
 
-    def __init__(self, repo_prestamo: RepositorioPrestamo, repo_cuenta: RepositorioCuenta):
+    def __init__(
+        self,
+        repo_prestamo: RepositorioPrestamo,
+        repo_cuenta: RepositorioCuenta,
+        motor_scoring: Optional[MotorScoring] = None,
+    ):
         self._repo_prestamo = repo_prestamo
         self._repo_cuenta = repo_cuenta
+        self._motor_scoring = motor_scoring
 
     def simular(
         self,
@@ -111,6 +144,11 @@ class SolicitarPrestamo:
         plazo_meses: int,
         sistema: str = 'frances',
     ) -> tuple[Optional[PrestamoEntity], str]:
+        if self._motor_scoring:
+            riesgo = self._motor_scoring.evaluar(cliente_id)
+            if riesgo >= self.UMBRAL_SCORING:
+                return None, f'Préstamo rechazado por scoring crediticio (riesgo: {riesgo:.2f}).'
+
         cartera = self._repo_prestamo.listar_por_cliente(cliente_id)
         prestamos_activos = [p for p in cartera if p.estado == 'activo']
         deuda_total = sum(p.saldo_pendiente for p in prestamos_activos)
@@ -245,3 +283,78 @@ class ObtenerDatosRiesgoEdadUseCase:
 
     def ejecutar(self) -> List[dict]:
         return self._repo_cliente.obtener_datos_riesgo_por_edad()
+
+
+# plazos fijos
+
+class ConstituirPlazoFijo:
+    MIN_DIAS = 30
+    MAX_DIAS = 365
+
+    def __init__(self, repo_plazo: RepositorioPlazoFijo, repo_cuenta: RepositorioCuenta):
+        self._repo_plazo = repo_plazo
+        self._repo_cuenta = repo_cuenta
+
+    def ejecutar(
+        self, cliente_id: int, cuenta_id: int, monto: Decimal, plazo_dias: int
+    ) -> tuple[Optional[PlazoFijoEntity], str]:
+        if monto <= 0:
+            return None, 'El monto debe ser un número positivo.'
+        if plazo_dias < self.MIN_DIAS or plazo_dias > self.MAX_DIAS:
+            return None, f'El plazo debe estar entre {self.MIN_DIAS} y {self.MAX_DIAS} días.'
+
+        cuenta = self._repo_cuenta.buscar_por_id_con_bloqueo(cuenta_id)
+        if cuenta is None:
+            return None, 'Cuenta no encontrada.'
+        if cuenta.cliente_id != cliente_id:
+            return None, 'La cuenta no te pertenece.'
+        if cuenta.estado != 'activa':
+            return None, 'La cuenta debe estar activa.'
+        if not validar_saldo_suficiente(cuenta.saldo, monto):
+            return None, 'Saldo insuficiente.'
+
+        from datetime import date, timedelta
+        hoy = date.today()
+        fecha_vencimiento = hoy + timedelta(days=plazo_dias)
+        monto_al_vencimiento = calcular_monto_al_vencimiento(monto, TASA_PLAZO_FIJO, plazo_dias)
+
+        plazo_entity = PlazoFijoEntity(
+            id=0, cliente_id=cliente_id, cuenta_id=cuenta_id,
+            monto=monto, plazo_dias=plazo_dias,
+            tasa_interes_anual=TASA_PLAZO_FIJO,
+            monto_al_vencimiento=monto_al_vencimiento,
+            fecha_vencimiento=fecha_vencimiento,
+        )
+
+        self._repo_cuenta.incrementar_saldo(cuenta_id, -monto)
+        plazo_creado = self._repo_plazo.crear(plazo_entity)
+
+        return plazo_creado, f'Plazo fijo constituido con éxito. Al vencimiento recibirás ${monto_al_vencimiento}.'
+
+
+class CancelarPlazoFijo:
+    PENALIZACION = Decimal('0.50')  # 50% del interés prorrateado
+
+    def __init__(self, repo_plazo: RepositorioPlazoFijo, repo_cuenta: RepositorioCuenta):
+        self._repo_plazo = repo_plazo
+        self._repo_cuenta = repo_cuenta
+
+    def ejecutar(self, plazo_id: int, cliente_id: int) -> tuple[bool, str]:
+        plazo = self._repo_plazo.buscar_por_id(plazo_id)
+        if plazo is None:
+            return False, 'Plazo fijo no encontrado.'
+        if plazo.cliente_id != cliente_id:
+            return False, 'Este plazo fijo no te pertenece.'
+        if plazo.estado != 'activo':
+            return False, 'El plazo fijo no está activo.'
+
+        dias_transcurridos = (date.today() - plazo.fecha_constitucion.date()).days if plazo.fecha_constitucion else 0
+        dias_devengo = max(dias_transcurridos, 0)
+        interes = calcular_interes_plazo_fijo(plazo.monto, plazo.tasa_interes_anual, dias_devengo)
+        penalizacion = interes * self.PENALIZACION
+        monto_devolucion = plazo.monto + penalizacion
+
+        self._repo_cuenta.incrementar_saldo(plazo.cuenta_id, monto_devolucion)
+        self._repo_plazo.cancelar(plazo_id)
+
+        return True, f'Plazo fijo cancelado. Se acreditaron ${monto_devolucion} en tu cuenta (capital + {self.PENALIZACION*100}% de los intereses devengados por {dias_devengo} día(s)).'

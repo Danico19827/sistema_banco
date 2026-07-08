@@ -79,6 +79,19 @@ def simular_cuotas_aleman(
     return cuotas
 
 
+TASA_PLAZO_FIJO = 0.08  # 8% anual fija
+
+
+def calcular_interes_plazo_fijo(monto: Decimal, tasa_anual: float, plazo_dias: int) -> Decimal:
+    interes = monto * Decimal(str(tasa_anual)) * Decimal(plazo_dias) / Decimal('365')
+    return interes
+
+
+def calcular_monto_al_vencimiento(monto: Decimal, tasa_anual: float, plazo_dias: int) -> Decimal:
+    interes = calcular_interes_plazo_fijo(monto, tasa_anual, plazo_dias)
+    return (monto + interes).quantize(Decimal('0.01'))
+
+
 def calcular_score_crediticio(
     ingreso_mensual: Decimal,
     score_inicial: int,

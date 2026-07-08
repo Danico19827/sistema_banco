@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Cargar Saldo - Banco Hexagonal{% endblock %}
+{% block content %}
+<div class="card card-wide">
+  <div class="card-logo">
+    <h1>Cargar Saldo</h1>
+    <p>Ingresá el monto que querés agregar a tu cuenta</p>
+  </div>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="field-group">
+      <label for="cuenta_id">Cuenta destino</label>
+      <select name="cuenta_id" id="cuenta_id" required>
+        <option value="">Seleccionar cuenta</option>
+        {% for c in cuentas %}
+          <option value="{{ c.id }}">{{ c.get_tipo_cuenta_display }} — {{ c.numero_cuenta }} ({{ c.moneda }} ${{ c.saldo|floatformat:2|intcomma }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field-group">
+      <label for="monto">Monto a cargar</label>
+      <input type="text" name="monto" id="monto"
+             data-currency
+             autocomplete="off" required>
+    </div>
+    <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
+      <a href="{% url 'panel' %}" class="btn btn-secondary" style="flex: 1;">Cancelar</a>
+      <button type="submit" class="btn btn-primary" style="flex: 3;">Cargar Saldo</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

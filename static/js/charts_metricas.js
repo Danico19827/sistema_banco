@@ -59,10 +59,12 @@ document.addEventListener('DOMContentLoaded', function() {
     purpleGradient.addColorStop(0, 'rgba(128, 90, 213, 0.4)'); 
     purpleGradient.addColorStop(1, 'rgba(128, 90, 213, 0.0)'); 
 
+    const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
     new Chart(ctxAreas, {
       type: 'line',
       data: {
-        labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],
+        labels: meses.slice(0, dataPrimario.length),
         datasets: [
           {
             label: 'Terciario/Universitario',

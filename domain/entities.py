@@ -74,3 +74,17 @@ class CuotaEntity:
     estado: str = 'pendiente'
     fecha_pago: Optional[date] = None
     monto_pagado: Optional[Decimal] = None
+
+
+@dataclass
+class PlazoFijoEntity:
+    id: int
+    cliente_id: int
+    cuenta_id: int
+    monto: Decimal
+    plazo_dias: int
+    tasa_interes_anual: float
+    monto_al_vencimiento: Decimal
+    fecha_constitucion: Optional[datetime] = None
+    fecha_vencimiento: Optional[date] = None
+    estado: str = 'activo'
