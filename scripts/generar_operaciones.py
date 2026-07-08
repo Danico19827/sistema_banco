@@ -70,9 +70,10 @@ def inc(k, n=1):
 
 def crear_lote(inicio, fin, password):
     """Crea usuarios usando User.objects.create_user() con sennal real."""
+    ts = int(time.time())
     lotes_users = []
     for i in range(inicio, fin):
-        username = f'muser_{i}'
+        username = f'gen_{ts}_{i}'
         first_name = f'Usuario{i}'
         last_name = f'Apellido{i}'
         try:
@@ -155,15 +156,20 @@ def crear_prestamo(cliente_id, cuenta_id, monto, plazo, sistema):
         return None
 
 
-def pagar_cuotas(prestamo, cuenta_id):
+def pagar_cuotas(prestamo_id, cuenta_id, cliente_id):
     """Usa PagarCuota para pagar hasta N cuotas."""
     try:
+        from infrastructure.models import CuotaPrestamo
         repo_p = DjangoPrestamoRepository()
         repo_c = DjangoCuentaRepository()
         caso = PagarCuota(repo_p, repo_c)
-        cuotas = prestamo.cuotas.filter(estado__in=['pendiente', 'vencida']).order_by('numero_cuota')[:3]
+        cuotas = CuotaPrestamo.objects.filter(
+            prestamo_id=prestamo_id,
+            estado__in=['pendiente', 'vencida'],
+        ).order_by('numero_cuota')[:3]
         for cuota in cuotas:
-            ok, _ = caso.ejecutar(cuota.id, cuenta_id, prestamo.cliente_id)
+            with transaction.atomic():
+                ok, _ = caso.ejecutar(cuota.id, cuenta_id, cliente_id)
             if ok:
                 inc('cuotas_pagadas')
     except Exception:
@@ -218,9 +224,9 @@ def worker_operaciones(cliente_id, cuenta_id, alias_destinos, prestamo_prob, pf_
         plazo = random.choice([6, 12, 18])
         sistema = random.choice(['frances', 'aleman'])
         p = crear_prestamo(cliente_id, cuenta_id, monto, plazo, sistema)
-        if p:
+        if p and hasattr(p, 'id'):
             if random.random() < 0.6:
-                pagar_cuotas(p, cuenta_id)
+                pagar_cuotas(p.id, cuenta_id, cliente_id)
 
     # Plazo fijo
     if random.random() < pf_prob:
@@ -253,7 +259,7 @@ def main():
     if args.crear:
         print(f'  Crear usuarios: {args.crear}')
     print(f'  Prob. prestamo: {args.prestamos}')
-    print(f'  Prob. plazo fijo: {args.plazos-fijos}')
+    print(f'  Prob. plazo fijo: {args.plazos_fijos}')
     print('=' * 55)
 
     # FASE 1: Crear usuarios
@@ -286,25 +292,12 @@ def main():
 
     alias_destinos = [c.alias or str(c.id) for c in cuentas]
 
-    batch_ops = [[] for _ in range(workers)]
-    for i, cta in enumerate(cuentas):
-        batch_ops[i % workers].append((
-            cta.cliente.id, cta.id, alias_destinos, args.prestamos, args.plazos_fijos
-        ))
+    pf_prob = args.plazos_fijos
+    tareas = [(cta.cliente.id, cta.id, alias_destinos, args.prestamos, pf_prob) for cta in cuentas]
+    random.shuffle(tareas)
 
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        futuros = [
-            ex.submit(worker_operaciones, *args_batch)
-            for batch in batch_ops if batch
-            for args_batch in [batch[0]]
-        ]
-        # Procesar batches
-        futuros = []
-        for batch in batch_ops:
-            if batch:
-                futuros.append(ex.submit(
-                    lambda b=batch: [worker_operaciones(*x) for x in b]
-                ))
+        futuros = [ex.submit(worker_operaciones, *t) for t in tareas[:200]]
         for f in as_completed(futuros):
             f.result()
 
